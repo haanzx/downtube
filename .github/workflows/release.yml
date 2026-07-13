@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (contoh: 0.1.0)'
+        required: true
+        type: string
+      notes:
+        description: 'Release notes'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Get previous tag
+        id: prevtag
+        run: |
+          PREV_TAG=$(git tag --sort=-v:refname | head -2 | tail -1)
+          echo "prev_tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ inputs.version }}"
+          name: "DownTube v${{ inputs.version }}"
+          body: |
+            ## DownTube v${{ inputs.version }}
+
+            ### What's New
+            ${{ inputs.notes }}
+
+            ---
+
+            ### Docker Install
+            ```bash
+            docker pull ghcr.io/haanzx/downtube:v${{ inputs.version }}
+            ```
+
+            ### CasaOS Install
+            - **Image**: `ghcr.io/haanzx/downtube:v${{ inputs.version }}`
+            - **Port**: `9876`
+            - **Volumes**:
+              - `/DATA/AppData/downtube` → `/app/data`
+              - `/DATA/Music/downtube` → `/app/music`
+
+            ### Full Changelog
+            https://github.com/haanzx/downtube/compare/${{ steps.prevtag.outputs.prev_tag }}...v${{ inputs.version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
