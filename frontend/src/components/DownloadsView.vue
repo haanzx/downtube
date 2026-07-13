@@ -6,7 +6,7 @@ import { deleteDownload, retryDownload } from "../api";
 import type { DownloadItem } from "../api";
 
 const { items, loading, refresh } = useDownloads();
-const { latest, connect, close, getLatest } = useSSE("/api/downloads/events");
+const { connect, close, getLatest } = useSSE("/api/downloads/events");
 
 function getProgress(item: DownloadItem): number {
   const ev = getLatest(item.id);

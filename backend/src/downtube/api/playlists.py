@@ -79,7 +79,7 @@ async def playlist_items(pid: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("/{pid}/sync")
 async def do_sync(pid: int, db: AsyncSession = Depends(get_db)):
-    music_root = Path(settings.MUSIC_ROOT)
+    music_root = Path(settings.music_root)
     try:
         result = await sync_playlist(db, pid, music_root)
     except ValueError as e:

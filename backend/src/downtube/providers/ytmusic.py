@@ -88,6 +88,25 @@ class YtmProvider:
     async def get_metadata(self, source_id: str) -> Any:
         raise NotImplementedError("metadata via ytmusicapi is implemented in P3")
 
+    async def get_playlist_items(self, playlist_id: str) -> list[dict[str, Any]]:
+        def _fetch() -> list[dict]:
+            client = self._client()
+            result = client.get_playlist(playlist_id, limit=10000)
+            return result.get("tracks", [])
+
+        import asyncio
+
+        raw = await asyncio.to_thread(_fetch)
+        return [
+            {
+                "video_id": t.get("videoId", ""),
+                "title": t.get("title", ""),
+                "artist": _artist_name(t),
+            }
+            for t in raw
+            if t.get("videoId")
+        ]
+
     async def resolve(self, url: str) -> Any:
         raise NotImplementedError
 

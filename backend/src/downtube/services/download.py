@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from downtube.db.models import QueueItem
 from downtube.db.repositories import queue as queue_repo
 from downtube.db.repositories.queue import list_items
 from downtube.schemas import DownloadRequest
@@ -10,7 +11,7 @@ async def list_queue(db: AsyncSession, limit: int = 100, offset: int = 0) -> lis
     return await list_items(db, limit=limit, offset=offset)
 
 
-async def enqueue(db: AsyncSession, payload: DownloadRequest) -> object:
+async def enqueue(db: AsyncSession, payload: DownloadRequest) -> QueueItem:
     """Persist a download request as a pending QueueItem (processed by the worker)."""
     defaults = await settings_service.get_settings(db)
     fmt = payload.format or defaults.get("default_format", "mp3")
