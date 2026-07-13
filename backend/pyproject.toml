@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "downtube"
+version = "0.1.0"
+description = "Self-hosted music downloader & library manager (FastAPI backend)"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0" }
+authors = [{ name = "DownTube contributors" }]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "sqlalchemy>=2.0",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.1",
+    "aiosqlite>=0.19",
+    "yt-dlp>=2024.1",
+    "ytmusicapi>=1.7",
+    "spotipy>=2.24",
+    "mutagen>=1.47",
+    "APScheduler>=3.10",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4",
+    "mypy>=1.9",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

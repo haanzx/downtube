@@ -1,0 +1,34 @@
+{
+  "name": "DownTube",
+  "slug": "downtube",
+  "version": "0.1.0",
+  "icon": "https://raw.githubusercontent.com/AdrianCasworthy/Other-Music-Icons/main/YouTube_Music_icon.png",
+  "tip": "Self-hosted music downloader & library manager. Supports YouTube, YouTube Music, and Spotify links.",
+  "https": false,
+  "url": "",
+  "img": "",
+  "home": "https://github.com/user/downtube",
+  "description": "Self-hosted music downloader & library manager. Download audio from YouTube / YouTube Music / Spotify, enrich with metadata, build playlists.",
+  "developer": "DownTube Contributors",
+  "category": "Music",
+  "init_path": "",
+  "arch": ["amd64", "arm64"],
+  "ports": ["9876"],
+  "volume": "",
+  "icon_font": "",
+  "icon_text": "",
+  "envs": [
+    {
+      "name": "SPOTIFY_CLIENT_ID",
+      "description": "Spotify Client ID (optional, for metadata)",
+      "type": "text",
+      "default": ""
+    },
+    {
+      "name": "SPOTIFY_CLIENT_SECRET",
+      "description": "Spotify Client Secret (optional, for metadata)",
+      "type": "text",
+      "default": ""
+    }
+  ]
+}

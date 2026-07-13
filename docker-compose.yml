@@ -1,0 +1,31 @@
+services:
+  downtube:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: downtube
+    ports:
+      - "9876:9876"
+    environment:
+      - MUSIC_ROOT=/app/music
+      - DATA_DIR=/app/data
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/downtube.db
+      - DOWNLOAD_CONCURRENCY=2
+      - YTDLP_PATH=yt-dlp
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID:-}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET:-}
+    volumes:
+      - downtube-data:/app/data
+      - downtube-music:/app/music
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:9876/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  downtube-data:
+  downtube-music:

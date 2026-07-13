@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.db
+*.db-journal
+
+# Node / frontend
+node_modules/
+frontend/dist/
+dist/
+.next/
+
+# Runtime data
+/data/
+/music/
+backend/music/
+*.log
+
+# Env
+.env
+.env.local
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Build artifacts
+*.tsbuildinfo
