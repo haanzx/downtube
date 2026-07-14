@@ -14,12 +14,18 @@ class Settings(BaseSettings):
     music_root: Path = Path("./music")
     data_dir: Path = Path("./data")
     database_url: str = "sqlite+aiosqlite:///./data/downtube.db"
-    download_concurrency: int = 2
+    download_concurrency: int = 1
     ytdlp_path: str = "yt-dlp"
     ffmpeg_path: str = "ffmpeg"
     default_format: str = "mp3"
     default_quality: str = "best"
     log_level: str = "info"
+
+    # Low-power mode settings (for STB HG680P and similar devices)
+    low_power_mode: bool = False
+    ffmpeg_threads: int = 1
+    max_search_results: int = 10
+    cover_cache_size: int = 50
 
     @property
     def frontend_dist(self) -> Path:

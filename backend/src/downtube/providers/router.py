@@ -5,20 +5,16 @@ The actual provider instances are wired in services; this module only
 classifies the URL so the rest of the code stays provider-agnostic.
 """
 
-from downtube.providers.spotify import is_spotify
-from downtube.providers.ytdlp import is_youtube, is_youtube_music
+from downtube.providers.registry import find_provider_for_url
 
 
 def provider_for_url(url: str) -> str:
     """Return the provider name for a given URL."""
-    if is_spotify(url):
-        return "spotify"
-    if is_youtube(url) or is_youtube_music(url):
-        return "ytdlp"
-    raise ValueError(f"Unsupported URL: {url}")
+    return find_provider_for_url(url).name
 
 
 def classify(url: str) -> str:
+    """Classify the URL type (track, album, playlist, artist)."""
     if "open.spotify.com" in url:
         if "/track/" in url:
             return "track"

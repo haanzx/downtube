@@ -65,6 +65,10 @@ def _normalise(item: dict, kind: str) -> dict[str, Any]:
 class YtmProvider:
     name = "ytmusic"
 
+    def can_handle(self, url: str) -> bool:
+        """Check if URL is a YouTube Music link."""
+        return "music.youtube.com" in url
+
     def _client(self) -> Any:
         from ytmusicapi import YTMusic
 

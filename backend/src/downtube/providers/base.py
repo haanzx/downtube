@@ -38,7 +38,13 @@ ProgressCallback = Callable[[float | None, str | None], Any]
 
 @runtime_checkable
 class MusicProvider(Protocol):
+    """Protocol for music providers (YouTube, Spotify, etc.)."""
+
     name: str
+
+    def can_handle(self, url: str) -> bool: ...
+
+    async def search(self, query: str, limit: int = 20) -> list[dict[str, Any]]: ...
 
     async def resolve(self, url: str) -> ResolveResult: ...
 

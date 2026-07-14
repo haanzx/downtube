@@ -28,6 +28,49 @@ def _ffmpeg_args() -> list[str]:
 class YtdlpProvider:
     name = "ytdlp"
 
+    def can_handle(self, url: str) -> bool:
+        """Check if URL is a YouTube video."""
+        return "youtube.com" in url or "youtu.be" in url
+
+    async def search(self, query: str, limit: int = 20) -> list[dict]:
+        """Search YouTube via yt-dlp (ytsearch:)."""
+        search_query = f"ytsearch{limit}:{query}"
+        cmd = self._base_cmd() + [
+            "--dump-json",
+            "--no-download",
+            "--no-warnings",
+            "--flat-playlist",
+            search_query,
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await proc.communicate()
+        text = out.decode(errors="ignore")
+
+        results = []
+        for line in text.splitlines():
+            line = line.strip()
+            if line.startswith("{"):
+                try:
+                    info = json.loads(line)
+                    vid = info.get("id", "")
+                    results.append({
+                        "id": vid,
+                        "title": info.get("title") or "untitled",
+                        "artist": info.get("artist") or info.get("uploader"),
+                        "duration": info.get("duration"),
+                        "type": "song",
+                        "url": f"https://www.youtube.com/watch?v={vid}" if vid else "",
+                        "thumbnail": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else None,
+                        "year": str(info.get("upload_date", ""))[:4] if info.get("upload_date") else None,
+                    })
+                except json.JSONDecodeError:
+                    continue
+        return results
+
     @staticmethod
     def _base_cmd() -> list[str]:
         # Use the interpreter's yt_dlp module so we don't depend on yt-dlp

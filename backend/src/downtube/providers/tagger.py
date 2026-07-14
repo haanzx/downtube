@@ -3,8 +3,13 @@
 `write_tags()` writes normalized tags (title, artist, album, etc.) plus
 optional cover art and lyrics (embedded USLT and/or sidecar .lrc) into
 an audio file.
+
+Cover art is cached in SQLite to reduce RAM usage on low-power devices.
 """
 
+import asyncio
+import urllib.request
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -47,14 +52,14 @@ def write_tags(
         if meta.cover_url:
             if on_phase:
                 on_phase("embedding cover", 93)
-            cover_data = _fetch_cover(meta.cover_url)
+            cover_data = _fetch_cover_cached(meta.cover_url)
         if cover_data:
             _embed_cover(audio, cover_data)
 
     audio.save()
 
     if cover_option in (CoverOption.FILE, CoverOption.BOTH) and meta.cover_url:
-        cover_data = _fetch_cover(meta.cover_url)
+        cover_data = _fetch_cover_cached(meta.cover_url)
         if cover_data:
             _save_cover_file(file_path, cover_data)
 
@@ -273,11 +278,82 @@ def _save_cover_file(file_path: str, data: bytes) -> None:
     cover.write_bytes(data)
 
 
-def _fetch_cover(url: str) -> bytes | None:
-    import urllib.request
+async def _check_cover_cache(url: str) -> bytes | None:
+    """Check SQLite cache for cover art."""
+    from downtube.db.session import SessionLocal
+    from sqlalchemy import text
 
+    async with SessionLocal() as db:
+        result = await db.execute(
+            text("SELECT data FROM cover_cache WHERE url = :url"), {"url": url}
+        )
+        row = result.fetchone()
+        if row:
+            return row[0]
+    return None
+
+
+async def _save_cover_cache(url: str, data: bytes) -> None:
+    """Save cover art to SQLite cache."""
+    from downtube.db.session import SessionLocal
+    from sqlalchemy import text
+
+    async with SessionLocal() as db:
+        await db.execute(
+            text("INSERT OR REPLACE INTO cover_cache (url, data, created_at) VALUES (:url, :data, :created_at)"),
+            {"url": url, "data": data, "created_at": datetime.utcnow()}
+        )
+        await db.commit()
+
+
+def _fetch_cover_cached(url: str) -> bytes | None:
+    """Fetch cover art with SQLite cache to reduce RAM usage on low-power devices."""
     try:
+        # Check cache first
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                cached_data = loop.run_until_complete(_check_cover_cache(url))
+                loop.close()
+            else:
+                cached_data = loop.run_until_complete(_check_cover_cache(url))
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            cached_data = loop.run_until_complete(_check_cover_cache(url))
+            loop.close()
+
+        if cached_data:
+            return cached_data
+
+        # Fetch from URL
         with urllib.request.urlopen(url, timeout=15) as resp:
-            return resp.read()
+            data = resp.read()
+
+        # Save to cache
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(_save_cover_cache(url, data))
+                loop.close()
+            else:
+                loop.run_until_complete(_save_cover_cache(url, data))
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(_save_cover_cache(url, data))
+            loop.close()
+
+        return data
+
     except Exception:
         return None
+
+
+def _fetch_cover(url: str) -> bytes | None:
+    """Legacy function for backward compatibility."""
+    return _fetch_cover_cached(url)

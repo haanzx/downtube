@@ -3,6 +3,8 @@
 Started once at app startup (lifespan). Polls the database for pending items
 and processes up to `concurrency` of them in parallel. Progress is written to
 the database and fanned out to SSE clients via the in-memory broker.
+
+Concurrency is controlled via asyncio.Semaphore for low-power device optimization.
 """
 
 import asyncio
@@ -33,6 +35,7 @@ class QueueProcessor:
         self._running = False
         self._task: asyncio.Task | None = None
         self._pipeline = DownloadPipeline()
+        self._semaphore = asyncio.Semaphore(self.concurrency)
 
     async def start(self) -> None:
         if self._running:
@@ -91,35 +94,36 @@ class QueueProcessor:
         )
 
     async def _process(self, item: QueueItem) -> None:
-        try:
-            await self._emit(item.id, 5.0, QueueStatus.RESOLVING, "resolving")
+        async with self._semaphore:
+            try:
+                await self._emit(item.id, 5.0, QueueStatus.RESOLVING, "resolving")
 
-            await self._pipeline.run(item, emit=self._emit)
+                await self._pipeline.run(item, emit=self._emit)
 
-            await self._emit(item.id, 100.0, QueueStatus.DONE, "done")
-            async with SessionLocal() as db:
-                row = await db.get(QueueItem, item.id)
-                if row is not None:
-                    await db.commit()
-            await broker.publish(
-                {
-                    "id": item.id,
-                    "progress": 100.0,
-                    "status": QueueStatus.DONE.value,
-                    "phase": "done",
-                    "phase_label": "Selesai",
-                }
-            )
-        except Exception as exc:  # noqa: BLE001
-            await self._emit(item.id, None, QueueStatus.FAILED, "error")
-            async with SessionLocal() as db:
-                row = await db.get(QueueItem, item.id)
-                if row is not None:
-                    row.error = str(exc)[:500]
-                    await db.commit()
-            await broker.publish(
-                {"id": item.id, "status": QueueStatus.FAILED.value, "phase": "error"}
-            )
+                await self._emit(item.id, 100.0, QueueStatus.DONE, "done")
+                async with SessionLocal() as db:
+                    row = await db.get(QueueItem, item.id)
+                    if row is not None:
+                        await db.commit()
+                await broker.publish(
+                    {
+                        "id": item.id,
+                        "progress": 100.0,
+                        "status": QueueStatus.DONE.value,
+                        "phase": "done",
+                        "phase_label": "Selesai",
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001
+                await self._emit(item.id, None, QueueStatus.FAILED, "error")
+                async with SessionLocal() as db:
+                    row = await db.get(QueueItem, item.id)
+                    if row is not None:
+                        row.error = str(exc)[:500]
+                        await db.commit()
+                await broker.publish(
+                    {"id": item.id, "status": QueueStatus.FAILED.value, "phase": "error"}
+                )
 
 
 processor = QueueProcessor()

@@ -45,6 +45,17 @@ export interface PreviewResult {
   track_count?: number;
 }
 
+export interface Settings {
+  default_format: string;
+  default_quality: string;
+  default_cover_option: string;
+  default_lyrics_option: string;
+  download_concurrency: string;
+  low_power_mode: boolean;
+  ffmpeg_threads: string;
+  max_search_results: string;
+}
+
 export async function getHealth(): Promise<{ status: string }> {
   const res = await fetch(`${BASE}/health`);
   return res.json();

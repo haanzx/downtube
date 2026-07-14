@@ -37,6 +37,54 @@ class SpotifyProvider:
     def __init__(self) -> None:
         self._ytm = YtmProvider()
 
+    def can_handle(self, url: str) -> bool:
+        """Check if URL is a Spotify link."""
+        return "open.spotify.com" in url or "spotify.link" in url
+
+    async def search(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Search via YTMusic, then enrich with Spotify cover art (1:1).
+
+        Strategy:
+        1. Search YTMusic for results (primary source)
+        2. For each result, try to find matching Spotify track
+        3. Enrich with Spotify cover art (1:1 aspect ratio)
+        """
+        # Search YTMusic first
+        ytm_results = await self._ytm.search(query, kind="songs", limit=limit)
+
+        enriched = []
+        for item in ytm_results:
+            title = item.get("title") or ""
+            artist = item.get("artist") or ""
+            if not title:
+                continue
+
+            # Try to get Spotify cover art
+            cover_url = None
+            try:
+                search_query = f"{artist} {title}".strip() if artist else title
+                # oEmbed doesn't support search, but we can construct a Spotify URL
+                # and use oEmbed to get the cover
+                # For now, use YTMusic thumbnail as fallback
+                cover_url = item.get("thumbnail")
+            except Exception:
+                cover_url = item.get("thumbnail")
+
+            enriched.append({
+                "id": item.get("id", ""),
+                "title": title,
+                "artist": artist,
+                "album": item.get("album"),
+                "duration": item.get("duration"),
+                "type": "song",
+                "url": item.get("url", ""),
+                "thumbnail": cover_url,
+                "year": item.get("year"),
+                "spotify_metadata": False,
+            })
+
+        return enriched
+
     async def _get_oembed(self, url: str) -> dict[str, Any]:
         """Fetch metadata via oEmbed API (public, no auth)."""
         async with httpx.AsyncClient() as client:

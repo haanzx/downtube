@@ -7,6 +7,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     Float,
     Integer,
+    LargeBinary,
     String,
     Text,
 )
@@ -97,3 +98,14 @@ class LibraryItem(Base):
     duration: Mapped[float | None] = mapped_column(Float, nullable=True)
     format: Mapped[str] = mapped_column(String, default="")
     last_scan: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CoverCache(Base):
+    """SQLite cache for cover art images to reduce RAM usage."""
+
+    __tablename__ = "cover_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    url: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

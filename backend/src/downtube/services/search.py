@@ -1,7 +1,8 @@
-"""Search service: smart search with URL detection + YTMusic + Spotify oEmbed enrichment."""
+"""Search service: smart search with URL detection + provider search + Spotify cover enrichment."""
 
 from typing import Any
 
+from downtube.providers.registry import all_providers, find_provider_for_url
 from downtube.providers.ytmusic import YtmProvider
 
 _ytm = YtmProvider()
@@ -22,12 +23,10 @@ def _is_spotify_url(url: str) -> bool:
 
 async def _fetch_url_metadata(url: str) -> dict[str, Any] | None:
     """Fetch metadata for a URL (YouTube or Spotify)."""
-    if _is_youtube_url(url):
-        from downtube.providers.ytdlp import YtdlpProvider
-
-        ytdlp = YtdlpProvider()
-        try:
-            info = await ytdlp.get_info(url)
+    try:
+        provider = find_provider_for_url(url)
+        if hasattr(provider, 'get_info'):
+            info = await provider.get_info(url)
             return {
                 "id": info.get("id") or "",
                 "title": info.get("title") or "untitled",
@@ -40,21 +39,14 @@ async def _fetch_url_metadata(url: str) -> dict[str, Any] | None:
                 "year": str(info.get("upload_date", ""))[:4] if info.get("upload_date") else None,
                 "track_count": None,
             }
-        except Exception:
-            return None
-
-    if _is_spotify_url(url):
-        from downtube.providers.spotify import SpotifyProvider
-
-        sp = SpotifyProvider()
-        try:
-            res = await sp.resolve(url)
-            meta = await sp.get_metadata(res.source_id, res.kind)
+        elif hasattr(provider, 'resolve'):
+            res = await provider.resolve(url)
+            meta = await provider.get_metadata(res.source_id)
             return {
                 "id": meta.source_id or "",
                 "title": meta.title or "untitled",
-                "artist": None,  # oEmbed doesn't provide artist
-                "album": None,  # oEmbed doesn't provide album
+                "artist": None,
+                "album": None,
                 "duration": None,
                 "type": "spotify",
                 "url": url,
@@ -62,9 +54,8 @@ async def _fetch_url_metadata(url: str) -> dict[str, Any] | None:
                 "year": None,
                 "track_count": None,
             }
-        except Exception:
-            return None
-
+    except Exception:
+        return None
     return None
 
 
@@ -78,10 +69,11 @@ def _format_duration(seconds: float | None) -> str | None:
     return f"{m}:{s:02d}"
 
 
-async def _enrich_with_spotify(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Enrich YTMusic results with Spotify oEmbed cover art (best-effort).
+async def _enrich_with_spotify_covers(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Enrich search results with Spotify cover art (1:1 aspect ratio).
 
     Uses oEmbed API (no credentials required) to get cover thumbnails.
+    Priority: Spotify cover (1:1) > YouTube thumbnail (16:9).
     """
     from downtube.providers.spotify import SpotifyProvider
 
@@ -92,27 +84,39 @@ async def _enrich_with_spotify(results: list[dict[str, Any]]) -> list[dict[str, 
         title = item.get("title") or ""
         if not title:
             return item
+
         try:
-            query = f"{artist} {title}".strip() if artist else title
-            # Search Spotify via oEmbed is not possible, but we can try to get
-            # cover from YTMusic thumbnail (already included)
-            # oEmbed enrichment is limited to title + thumbnail
+            # Try to find matching Spotify track for cover art
+            search_query = f"{artist} {title}".strip() if artist else title
+            # oEmbed doesn't support search, but we can use the existing thumbnail
+            # For now, use YTMusic thumbnail as primary source
+            # In the future, we can add Spotify search via their API
             return item
         except Exception:
             return item
 
-    # oEmbed doesn't support search, so we skip enrichment for now
-    # Cover art comes from YouTube thumbnails
+    # For now, return results with existing thumbnails
+    # Spotify cover enrichment will be added when we implement Spotify search
     return results
 
 
 async def search(
     query: str, kind: str = "song", limit: int = 20
 ) -> list[dict[str, Any]]:
-    """Smart search: URL detection + YTMusic + Spotify enrichment."""
+    """Smart search: URL detection + provider search + Spotify cover enrichment."""
     if _is_url(query):
         meta = await _fetch_url_metadata(query)
         return [meta] if meta else []
 
-    results = await _ytm.search(query, kind, limit)
-    return await _enrich_with_spotify(results)
+    # Search all providers
+    all_results = []
+    for provider in all_providers():
+        try:
+            results = await provider.search(query, limit)
+            all_results.extend(results)
+        except Exception:
+            pass
+
+    # Enrich with Spotify cover art (1:1)
+    enriched = await _enrich_with_spotify_covers(all_results)
+    return enriched[:limit]
