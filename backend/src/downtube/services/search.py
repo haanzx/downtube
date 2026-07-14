@@ -1,5 +1,6 @@
-"""Search service: smart search with URL detection + provider search + Spotify cover enrichment."""
+"""Search service: smart search with URL detection + provider search + cover art enrichment."""
 
+import asyncio
 from typing import Any
 
 from downtube.providers.registry import all_providers, find_provider_for_url
@@ -69,15 +70,14 @@ def _format_duration(seconds: float | None) -> str | None:
     return f"{m}:{s:02d}"
 
 
-async def _enrich_with_spotify_covers(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Enrich search results with Spotify cover art (1:1 aspect ratio).
+async def _enrich_with_cover_art(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Enrich search results with cover art from MusicBrainz + CAA.
 
-    Uses oEmbed API (no credentials required) to get cover thumbnails.
-    Priority: Spotify cover (1:1) > YouTube thumbnail (16:9).
+    Priority:
+    1. MusicBrainz (1:1 square, 500x500)
+    2. YouTube Thumbnail (16:9, fallback)
     """
-    from downtube.providers.spotify import SpotifyProvider
-
-    sp = SpotifyProvider()
+    from downtube.providers.musicbrainz import musicbrainz_cover
 
     async def _enrich_one(item: dict[str, Any]) -> dict[str, Any]:
         artist = item.get("artist") or ""
@@ -85,25 +85,26 @@ async def _enrich_with_spotify_covers(results: list[dict[str, Any]]) -> list[dic
         if not title:
             return item
 
-        try:
-            # Try to find matching Spotify track for cover art
-            search_query = f"{artist} {title}".strip() if artist else title
-            # oEmbed doesn't support search, but we can use the existing thumbnail
-            # For now, use YTMusic thumbnail as primary source
-            # In the future, we can add Spotify search via their API
-            return item
-        except Exception:
-            return item
+        # Try MusicBrainz first (1:1 square cover)
+        cover_url = await musicbrainz_cover.search_cover(artist, title)
+        if cover_url:
+            item["thumbnail"] = cover_url
+            item["cover_source"] = "musicbrainz"
+        else:
+            # Fallback to YouTube thumbnail (already in item)
+            item["cover_source"] = "youtube"
 
-    # For now, return results with existing thumbnails
-    # Spotify cover enrichment will be added when we implement Spotify search
-    return results
+        return item
+
+    # Enrich all results concurrently
+    enriched = await asyncio.gather(*[_enrich_one(item) for item in results])
+    return list(enriched)
 
 
 async def search(
     query: str, kind: str = "song", limit: int = 20
 ) -> list[dict[str, Any]]:
-    """Smart search: URL detection + provider search + Spotify cover enrichment."""
+    """Smart search: URL detection + provider search + cover art enrichment."""
     if _is_url(query):
         meta = await _fetch_url_metadata(query)
         return [meta] if meta else []
@@ -117,6 +118,6 @@ async def search(
         except Exception:
             pass
 
-    # Enrich with Spotify cover art (1:1)
-    enriched = await _enrich_with_spotify_covers(all_results)
+    # Enrich with cover art from MusicBrainz (1:1 square)
+    enriched = await _enrich_with_cover_art(all_results)
     return enriched[:limit]
