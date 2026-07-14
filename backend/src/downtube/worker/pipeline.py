@@ -43,6 +43,7 @@ class PipelineContext:
     download_url: str = ""
     output_path: str = ""
     emit: Callable | None = None
+    loop: asyncio.AbstractEventLoop | None = None
 
     async def update_metadata(
         self,
@@ -142,10 +143,10 @@ class DownloadStage(PipelineStage):
         out_path = settings.music_root / base
 
         def on_progress(percent: float | None, phase: str | None) -> None:
-            if ctx.emit:
+            if ctx.emit and ctx.loop:
                 asyncio.run_coroutine_threadsafe(
                     ctx.emit(ctx.item.id, percent, None, phase),
-                    asyncio.get_event_loop(),
+                    ctx.loop,
                 )
 
         ctx.output_path = await asyncio.to_thread(
@@ -204,10 +205,10 @@ class MetadataStage(PipelineStage):
         lyrics_opt = LyricsOption(ctx.item.lyrics_option)
 
         def on_tag_phase(phase: str, prog: float) -> None:
-            if ctx.emit:
+            if ctx.emit and ctx.loop:
                 asyncio.run_coroutine_threadsafe(
                     ctx.emit(ctx.item.id, prog, None, phase),
-                    asyncio.get_event_loop(),
+                    ctx.loop,
                 )
 
         await asyncio.to_thread(
@@ -231,7 +232,8 @@ class DownloadPipeline:
         emit: Callable | None = None,
     ) -> None:
         """Run the full pipeline for a queue item."""
-        ctx = PipelineContext(item=item, emit=emit)
+        loop = asyncio.get_event_loop()
+        ctx = PipelineContext(item=item, emit=emit, loop=loop)
 
         for stage in self.stages:
             await self._emit_stage(item.id, stage, emit)
