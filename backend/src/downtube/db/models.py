@@ -19,10 +19,13 @@ class Base(DeclarativeBase):
 
 class QueueStatus(str, Enum):
     PENDING = "pending"
+    RESOLVING = "resolving"
     DOWNLOADING = "downloading"
+    TRANSCODING = "transcoding"
+    TAGGING = "tagging"
     DONE = "done"
-    ERROR = "error"
-    CANCELED = "canceled"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class Setting(Base):
@@ -60,7 +63,6 @@ class QueueItem(Base):
     )
 
 
-
 class Playlist(Base):
     __tablename__ = "playlists"
 
@@ -78,7 +80,20 @@ class PlaylistItem(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     playlist_id: Mapped[int] = mapped_column(Integer, nullable=False)
     video_id: Mapped[str] = mapped_column(String, nullable=False)
-    title: Mapped[str | None] = mapped_column(String, nullable=True)
-    artist: Mapped[str | None] = mapped_column(String, nullable=True)
     output_path: Mapped[str | None] = mapped_column(String, nullable=True)
     synced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class LibraryItem(Base):
+    __tablename__ = "library_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    file_path: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
+    file_mtime: Mapped[float] = mapped_column(Float, default=0.0)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    artist: Mapped[str | None] = mapped_column(String, nullable=True)
+    album: Mapped[str | None] = mapped_column(String, nullable=True)
+    duration: Mapped[float | None] = mapped_column(Float, nullable=True)
+    format: Mapped[str] = mapped_column(String, default="")
+    last_scan: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

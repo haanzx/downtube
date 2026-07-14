@@ -40,7 +40,7 @@ const activeItems = computed(() =>
   }),
 );
 const doneItems = computed(() => items.value.filter((i) => getStatus(i) === "done"));
-const errorItems = computed(() => items.value.filter((i) => getStatus(i) === "error"));
+const errorItems = computed(() => items.value.filter((i) => getStatus(i) === "failed"));
 
 const PHASE_LABELS: Record<string, string> = {
   resolving: "Mengambil info...",

@@ -127,7 +127,7 @@ class QueueProcessor:
             )
 
         try:
-            await self._emit(item.id, 5.0, QueueStatus.DOWNLOADING, "resolving")
+            await self._emit(item.id, 5.0, QueueStatus.RESOLVING, "resolving")
 
             from downtube.providers.base import TrackMetadata
             from downtube.providers.router import provider_for_url
@@ -176,7 +176,7 @@ class QueueProcessor:
                     cover_url=yt_cover,
                 )
 
-            await self._emit(item.id, 10.0, None, "downloading")
+            await self._emit(item.id, 10.0, QueueStatus.DOWNLOADING, "downloading")
 
             base = _safe_name(item.title or info.get("title", "untitled"))
             out_path = settings.music_root / base
@@ -188,7 +188,7 @@ class QueueProcessor:
                 on_progress,
             )
 
-            await self._emit(item.id, 87.0, None, "transcoding")
+            await self._emit(item.id, 87.0, QueueStatus.TRANSCODING, "transcoding")
 
             vid = info.get("id", "")
 
@@ -214,6 +214,8 @@ class QueueProcessor:
 
             cover_opt = CoverOption(item.cover_option)
             lyrics_opt = LyricsOption(item.lyrics_option)
+
+            await self._emit(item.id, 92.0, QueueStatus.TAGGING, "writing metadata")
 
             def on_tag_phase(phase: str, prog: float) -> None:
                 asyncio.run_coroutine_threadsafe(
@@ -241,14 +243,14 @@ class QueueProcessor:
                 }
             )
         except Exception as exc:  # noqa: BLE001
-            await self._emit(item.id, None, QueueStatus.ERROR, "error")
+            await self._emit(item.id, None, QueueStatus.FAILED, "error")
             async with SessionLocal() as db:
                 row = await db.get(QueueItem, item.id)
                 if row is not None:
                     row.error = str(exc)[:500]
                     await db.commit()
             await broker.publish(
-                {"id": item.id, "status": QueueStatus.ERROR.value, "phase": "error"}
+                {"id": item.id, "status": QueueStatus.FAILED.value, "phase": "error"}
             )
 
 

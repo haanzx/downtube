@@ -8,8 +8,6 @@ DEFAULTS = {
     "default_cover_option": "embed",
     "default_lyrics_option": "embed",
     "download_concurrency": "2",
-    "spotify_client_id": "",
-    "spotify_client_secret": "",
 }
 
 

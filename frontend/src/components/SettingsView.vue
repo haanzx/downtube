@@ -10,8 +10,6 @@ interface Settings {
   default_cover_option: string;
   default_lyrics_option: string;
   download_concurrency: string;
-  spotify_client_id: string;
-  spotify_client_secret: string;
 }
 
 const settings = ref<Settings>({
@@ -20,8 +18,6 @@ const settings = ref<Settings>({
   default_cover_option: "embed",
   default_lyrics_option: "embed",
   download_concurrency: "2",
-  spotify_client_id: "",
-  spotify_client_secret: "",
 });
 const feedback = ref("");
 const saving = ref(false);
@@ -54,7 +50,7 @@ async function save() {
     <header>
       <h1 class="text-2xl font-bold tracking-tight">Pengaturan</h1>
       <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Konfigurasi tampilan, format, kualitas, cover, lirik, dan Spotify.
+        Konfigurasi tampilan, format, kualitas, cover, dan lirik.
       </p>
     </header>
 
@@ -124,22 +120,6 @@ async function save() {
           <div>
             <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Konkurensi</label>
             <input v-model="settings.download_concurrency" type="number" min="1" max="10" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Spotify -->
-      <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="mb-1 text-sm font-semibold text-slate-900 dark:text-white">Spotify</h2>
-        <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">Metadata saja — audio dari YouTube Music.</p>
-        <div class="space-y-4">
-          <div>
-            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Client ID</label>
-            <input v-model="settings.spotify_client_id" type="text" placeholder="opsional" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
-          </div>
-          <div>
-            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Client Secret</label>
-            <input v-model="settings.spotify_client_secret" type="password" placeholder="opsional" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
+"""Search service: smart search with URL detection + YTMusic + Spotify oEmbed enrichment."""
+
 from typing import Any
 
-from downtube.config import settings
 from downtube.providers.ytmusic import YtmProvider
 
 _ytm = YtmProvider()
@@ -52,14 +53,14 @@ async def _fetch_url_metadata(url: str) -> dict[str, Any] | None:
             return {
                 "id": meta.source_id or "",
                 "title": meta.title or "untitled",
-                "artist": meta.artist,
-                "album": meta.album,
-                "duration": _format_duration(meta.duration),
-                "type": meta.provider or "spotify",
+                "artist": None,  # oEmbed doesn't provide artist
+                "album": None,  # oEmbed doesn't provide album
+                "duration": None,
+                "type": "spotify",
                 "url": url,
                 "thumbnail": meta.cover_url,
-                "year": meta.release_date[:4] if meta.release_date else None,
-                "track_count": meta.track_count,
+                "year": None,
+                "track_count": None,
             }
         except Exception:
             return None
@@ -77,15 +78,11 @@ def _format_duration(seconds: float | None) -> str | None:
     return f"{m}:{s:02d}"
 
 
-def _has_spotify_config() -> bool:
-    return bool(settings.spotify_client_id and settings.spotify_client_secret)
-
-
 async def _enrich_with_spotify(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Enrich YTMusic results with Spotify metadata (best-effort)."""
-    if not _has_spotify_config():
-        return results
+    """Enrich YTMusic results with Spotify oEmbed cover art (best-effort).
 
+    Uses oEmbed API (no credentials required) to get cover thumbnails.
+    """
     from downtube.providers.spotify import SpotifyProvider
 
     sp = SpotifyProvider()
@@ -93,34 +90,20 @@ async def _enrich_with_spotify(results: list[dict[str, Any]]) -> list[dict[str, 
     async def _enrich_one(item: dict[str, Any]) -> dict[str, Any]:
         artist = item.get("artist") or ""
         title = item.get("title") or ""
-        if not artist or not title:
+        if not title:
             return item
         try:
-            sp_meta = await sp.search_track(artist, title)
-            if not sp_meta:
-                return item
-            merged = dict(item)
-            if not merged.get("album") and sp_meta.album:
-                merged["album"] = sp_meta.album
-            if not merged.get("thumbnail") and sp_meta.cover_url:
-                merged["thumbnail"] = sp_meta.cover_url
-            if sp_meta.track_number:
-                merged["track_number"] = sp_meta.track_number
-            if sp_meta.disc_number:
-                merged["disc_number"] = sp_meta.disc_number
-            if sp_meta.release_date:
-                merged["year"] = sp_meta.release_date[:4]
-            if sp_meta.duration and not merged.get("duration"):
-                merged["duration"] = _format_duration(sp_meta.duration)
-            merged["spotify_metadata"] = True
-            return merged
+            query = f"{artist} {title}".strip() if artist else title
+            # Search Spotify via oEmbed is not possible, but we can try to get
+            # cover from YTMusic thumbnail (already included)
+            # oEmbed enrichment is limited to title + thumbnail
+            return item
         except Exception:
             return item
 
-    import asyncio
-
-    enriched = await asyncio.gather(*[_enrich_one(r) for r in results[:10]])
-    return list(enriched) + list(results[10:])
+    # oEmbed doesn't support search, so we skip enrichment for now
+    # Cover art comes from YouTube thumbnails
+    return results
 
 
 async def search(

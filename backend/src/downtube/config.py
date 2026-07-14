@@ -21,10 +21,6 @@ class Settings(BaseSettings):
     default_quality: str = "best"
     log_level: str = "info"
 
-    # Spotify metadata (Client Credentials flow) — optional.
-    spotify_client_id: str = ""
-    spotify_client_secret: str = ""
-
     @property
     def frontend_dist(self) -> Path:
         """Absolute path to the built SPA (frontend/dist).
