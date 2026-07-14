@@ -20,7 +20,7 @@ MIME_MAP = {
 
 @router.get("")
 async def library() -> list[dict]:
-    return library_service.scan_library()
+    return await library_service.scan_library()
 
 
 @router.get("/stream")
