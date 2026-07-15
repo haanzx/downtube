@@ -6,7 +6,6 @@ DEFAULTS = {
     "default_format": "mp3",
     "default_quality": "best",
     "default_cover_option": "embed",
-    "default_lyrics_option": "embed",
     "download_concurrency": "2",
 }
 

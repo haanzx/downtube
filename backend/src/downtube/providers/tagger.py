@@ -24,18 +24,10 @@ class CoverOption(str, Enum):
     NONE = "none"
 
 
-class LyricsOption(str, Enum):
-    EMBED = "embed"
-    LRC = "lrc"
-    BOTH = "both"
-    NONE = "none"
-
-
 def write_tags(
     file_path: str,
     meta: TrackMetadata,
     cover_option: CoverOption = CoverOption.EMBED,
-    lyrics_option: LyricsOption = LyricsOption.EMBED,
     on_phase=None,
 ) -> None:
     """Write normalized tags (and optionally cover/lyrics) into the audio file."""
@@ -63,13 +55,10 @@ def write_tags(
     if cover_option in (CoverOption.FILE, CoverOption.BOTH) and cover_data:
         _save_cover_file(file_path, cover_data)
 
-    if lyrics_option in (LyricsOption.LRC, LyricsOption.BOTH) and meta.synced_lyrics:
+    if meta.synced_lyrics:
         if on_phase:
-            on_phase("embedding lyrics", 95)
+            on_phase("writing lyrics", 95)
         _write_lrc(file_path, meta)
-
-    if lyrics_option in (LyricsOption.EMBED, LyricsOption.BOTH) and meta.lyrics:
-        _embed_lyrics(file_path, meta.lyrics)
 
 
 def _load_audio(file_path: str) -> Any:
@@ -245,51 +234,21 @@ def _embed_cover(audio: Any, data: bytes) -> None:
         audio.tags["METADATA_BLOCK_PICTURE"] = [b64]
 
 
-def _embed_lyrics(file_path: str, lyrics: str) -> None:
-    audio = _load_audio(file_path)
-    if audio is None:
-        return
-    fmt = type(audio).__name__
-
-    if fmt == "MP3":
-        from mutagen.id3 import ID3, USLT
-        if not isinstance(audio.tags, ID3):
-            audio.add_tags()
-        audio.tags.add(USLT(encoding=3, lang="eng", desc="", text=lyrics))
-        audio.save()
-
-    elif fmt == "MP4":
-        # M4A/AAC: use iTunes-style lyrics tag
-        if audio.tags is None:
-            audio.add_tags()
-        audio.tags["\xa9lyr"] = lyrics
-        audio.save()
-
-    elif fmt == "FLAC":
-        # FLAC: use Vorbis comment
-        if audio.tags is None:
-            audio.add_tags()
-        audio.tags["LYRICS"] = lyrics
-        audio.save()
-
-    elif fmt == "OggOpus" or fmt == "OggVorbis":
-        # Ogg: use Vorbis comment
-        if audio.tags is None:
-            audio.add_tags()
-        audio.tags["LYRICS"] = lyrics
-        audio.save()
-
-
 def _write_lrc(file_path: str, meta: TrackMetadata) -> None:
     if not meta.synced_lyrics:
         return
     p = Path(file_path)
     lrc_path = p.with_suffix(".lrc")
     lines = []
-    if meta.title or meta.artist:
-        lines.append(f"[ti:{meta.title or ''}]")
-        lines.append(f"[ar:{meta.artist or ''}]")
-    lines.append(meta.synced_lyrics)
+    if meta.title:
+        lines.append(f"[ti:{meta.title}]")
+    if meta.artist:
+        lines.append(f"[ar:{meta.artist}]")
+    if meta.album:
+        lines.append(f"[al:{meta.album}]")
+    lines.append("[offset:0]")
+    content = meta.synced_lyrics.replace("\r\n", "\n").replace("\r", "\n").strip()
+    lines.append(content)
     lrc_path.write_text("\n".join(lines), encoding="utf-8")
 
 

@@ -63,15 +63,20 @@ async def fetch_synced_lyrics(
     if video_id:
         lyrics = await _fetch_ytmusic_timed_lyrics(video_id)
         if lyrics:
-            return lyrics
+            return _normalize_lrc(lyrics)
 
     # Fallback to LRCLIB (returns synced LRC directly)
     if title and artist:
         lyrics = await _fetch_lrclib_synced_lyrics(title, artist, duration)
         if lyrics:
-            return lyrics
+            return _normalize_lrc(lyrics)
 
     return None
+
+
+def _normalize_lrc(text: str) -> str:
+    """Normalize LRC content: fix line endings and strip."""
+    return text.replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
 async def _fetch_ytmusic_lyrics(video_id: str) -> str | None:

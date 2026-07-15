@@ -50,7 +50,6 @@ class QueueItem(Base):
     format: Mapped[str] = mapped_column(String, default="mp3")
     quality: Mapped[str] = mapped_column(String, default="best")
     cover_option: Mapped[str] = mapped_column(String, default="embed")
-    lyrics_option: Mapped[str] = mapped_column(String, default="embed")
     artist: Mapped[str | None] = mapped_column(String, nullable=True)
     album: Mapped[str | None] = mapped_column(String, nullable=True)
     phase: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -49,7 +49,6 @@ export interface Settings {
   default_format: string;
   default_quality: string;
   default_cover_option: string;
-  default_lyrics_option: string;
   download_concurrency: string;
   low_power_mode: boolean;
   ffmpeg_threads: string;
@@ -69,7 +68,7 @@ export async function listDownloads(): Promise<DownloadItem[]> {
 
 export async function createDownload(
   url: string,
-  opts?: { title?: string; artist?: string; album?: string; cover_url?: string; format?: string; quality?: string; cover_option?: string; lyrics_option?: string },
+  opts?: { title?: string; artist?: string; album?: string; cover_url?: string; format?: string; quality?: string; cover_option?: string },
 ): Promise<DownloadItem> {
   const res = await fetch(`${BASE}/downloads`, {
     method: "POST",

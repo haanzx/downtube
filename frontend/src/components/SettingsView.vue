@@ -8,7 +8,6 @@ interface Settings {
   default_format: string;
   default_quality: string;
   default_cover_option: string;
-  default_lyrics_option: string;
   download_concurrency: string;
   low_power_mode: boolean;
   ffmpeg_threads: string;
@@ -19,7 +18,6 @@ const settings = ref<Settings>({
   default_format: "mp3",
   default_quality: "best",
   default_cover_option: "embed",
-  default_lyrics_option: "embed",
   download_concurrency: "1",
   low_power_mode: false,
   ffmpeg_threads: "1",
@@ -56,7 +54,7 @@ async function save() {
     <header>
       <h1 class="text-2xl font-bold tracking-tight">Pengaturan</h1>
       <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Konfigurasi tampilan, format, kualitas, cover, lirik, dan performa.
+        Konfigurasi tampilan, format, kualitas, cover, dan performa.
       </p>
     </header>
 
@@ -110,15 +108,6 @@ async function save() {
             <select v-model="settings.default_cover_option" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10">
               <option value="embed">Tanam</option>
               <option value="file">File</option>
-              <option value="both">Keduanya</option>
-              <option value="none">Tidak ada</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Lirik</label>
-            <select v-model="settings.default_lyrics_option" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10">
-              <option value="embed">Tanam</option>
-              <option value="lrc">File .lrc</option>
               <option value="both">Keduanya</option>
               <option value="none">Tidak ada</option>
             </select>

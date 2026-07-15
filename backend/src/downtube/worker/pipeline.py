@@ -216,11 +216,7 @@ class LyricsStage(PipelineStage):
     phase_label = "Mengambil lirik..."
 
     async def run(self, ctx: PipelineContext) -> None:
-        from downtube.providers.lyrics import fetch_lyrics, fetch_synced_lyrics
-
-        # Skip if lyrics option is none
-        if ctx.item.lyrics_option == "none":
-            return
+        from downtube.providers.lyrics import fetch_synced_lyrics
 
         # Get video_id from context
         video_id = None
@@ -234,27 +230,15 @@ class LyricsStage(PipelineStage):
         artist = ctx.meta.artist if ctx.meta else (ctx.info.get("artist") or ctx.info.get("uploader"))
         duration = int(ctx.meta.duration) if ctx.meta and ctx.meta.duration else None
 
-        # Fetch plain lyrics (for USLT embed)
-        lyrics = await fetch_lyrics(
+        # Fetch synced lyrics (for .lrc file)
+        synced = await fetch_synced_lyrics(
             video_id=video_id,
             title=title,
             artist=artist,
             duration=duration,
         )
-
-        if lyrics and ctx.meta:
-            ctx.meta.lyrics = lyrics
-
-        # Fetch synced lyrics (for LRC file)
-        if ctx.item.lyrics_option in ("lrc", "both"):
-            synced = await fetch_synced_lyrics(
-                video_id=video_id,
-                title=title,
-                artist=artist,
-                duration=duration,
-            )
-            if synced and ctx.meta:
-                ctx.meta.synced_lyrics = synced
+        if synced and ctx.meta:
+            ctx.meta.synced_lyrics = synced
 
 
 class CoverStage(PipelineStage):
@@ -308,7 +292,7 @@ class MetadataStage(PipelineStage):
     phase_label = "Menulis metadata..."
 
     async def run(self, ctx: PipelineContext) -> None:
-        from downtube.providers.tagger import CoverOption, LyricsOption, write_tags
+        from downtube.providers.tagger import CoverOption, write_tags
 
         # Use metadata from pipeline context if available
         if ctx.meta is None:
@@ -337,7 +321,6 @@ class MetadataStage(PipelineStage):
                 ctx.meta.cover_url = ctx.item.cover_url or None
 
         cover_opt = CoverOption(ctx.item.cover_option)
-        lyrics_opt = LyricsOption(ctx.item.lyrics_option)
 
         def on_tag_phase(phase: str, prog: float) -> None:
             if ctx.emit and ctx.loop:
@@ -347,7 +330,7 @@ class MetadataStage(PipelineStage):
                 )
 
         await asyncio.to_thread(
-            write_tags, ctx.output_path, ctx.meta, cover_opt, lyrics_opt, on_tag_phase
+            write_tags, ctx.output_path, ctx.meta, cover_opt, on_tag_phase
         )
 
 
