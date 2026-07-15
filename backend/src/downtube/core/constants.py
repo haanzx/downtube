@@ -19,6 +19,3 @@ AUDIO_MIME = {
 
 # YouTube thumbnail URL template
 YT_THUMBNAIL = "https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
-
-# Spotify oEmbed endpoint
-SPOTIFY_OEMBED = "https://open.spotify.com/oembed"

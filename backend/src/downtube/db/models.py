@@ -81,6 +81,8 @@ class PlaylistItem(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     playlist_id: Mapped[int] = mapped_column(Integer, nullable=False)
     video_id: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    artist: Mapped[str | None] = mapped_column(String, nullable=True)
     output_path: Mapped[str | None] = mapped_column(String, nullable=True)
     synced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

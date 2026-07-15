@@ -1,6 +1,6 @@
 """Metadata resolver: unified layer for resolving metadata from multiple sources.
 
-Combines metadata from YouTube and Spotify (via oEmbed) into a single
+Combines metadata from YouTube and Spotify (via embed scraping) into a single
 TrackMetadata object. Makes it easy to add new sources (MusicBrainz, Discogs)
 in the future.
 """
@@ -37,11 +37,37 @@ class MetadataResolver:
         raise ValueError(f"URL tidak didukung: {url}")
 
     async def _resolve_spotify(self, url: str) -> tuple[TrackMetadata, str | None]:
-        """Resolve Spotify URL: oEmbed → YTMusic match."""
-        from downtube.providers.spotify import SpotifyProvider
+        """Resolve Spotify URL: embed scrape → YTMusic match."""
+        from downtube.providers.spotify_embed import scrape_track
+        from downtube.providers.ytmusic import YtmProvider
 
-        sp = SpotifyProvider()
-        return await sp.resolve_and_match(url)
+        # Scrape Spotify embed page
+        meta = await scrape_track(url)
+
+        # Search YTMusic by duration
+        ytm = YtmProvider()
+        yt_match = await ytm.search_by_duration(
+            meta["name"],
+            meta["artists"][0] if meta["artists"] else "",
+            meta["duration"],
+        )
+
+        if not yt_match:
+            raise ValueError(f"Tidak bisa mencocokkan ke YouTube: {meta['artist']} - {meta['name']}")
+
+        # Build TrackMetadata
+        track_meta = TrackMetadata(
+            title=meta["name"],
+            artist=meta["artist"],
+            album=meta.get("album_name"),
+            cover_url=meta.get("cover_url"),
+            duration=meta.get("duration"),
+            release_date=meta.get("release_date"),
+            source_id=meta.get("song_id"),
+            provider="spotify",
+        )
+
+        return track_meta, f"https://www.youtube.com/watch?v={yt_match['id']}"
 
     async def _resolve_youtube(self, url: str) -> tuple[TrackMetadata, str | None]:
         """Resolve YouTube URL: yt-dlp info → metadata."""
@@ -75,11 +101,7 @@ class MetadataResolver:
     async def get_search_metadata(
         self, results: list[dict[str, Any]], source: str = "ytmusic"
     ) -> list[dict[str, Any]]:
-        """Enrich search results with metadata from additional sources.
-
-        Currently enriches YTMusic results with Spotify oEmbed thumbnails.
-        """
-        # oEmbed doesn't support search, so we rely on YTMusic thumbnails
+        """Enrich search results with metadata from additional sources."""
         return results
 
 

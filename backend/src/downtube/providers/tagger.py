@@ -7,9 +7,9 @@ an audio file.
 Cover art is cached in SQLite to reduce RAM usage on low-power devices.
 """
 
-import asyncio
+import sqlite3
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -47,23 +47,23 @@ def write_tags(
 
     _write_base_tags(audio, meta)
 
-    if cover_option in (CoverOption.EMBED, CoverOption.BOTH):
-        cover_data = None
+    # Fetch cover once (shared between embed and file)
+    cover_data = None
+    if cover_option in (CoverOption.EMBED, CoverOption.BOTH, CoverOption.FILE):
         if meta.cover_url:
             if on_phase:
                 on_phase("embedding cover", 93)
             cover_data = _fetch_cover_cached(meta.cover_url)
-        if cover_data:
-            _embed_cover(audio, cover_data)
+
+    if cover_option in (CoverOption.EMBED, CoverOption.BOTH) and cover_data:
+        _embed_cover(audio, cover_data)
 
     audio.save()
 
-    if cover_option in (CoverOption.FILE, CoverOption.BOTH) and meta.cover_url:
-        cover_data = _fetch_cover_cached(meta.cover_url)
-        if cover_data:
-            _save_cover_file(file_path, cover_data)
+    if cover_option in (CoverOption.FILE, CoverOption.BOTH) and cover_data:
+        _save_cover_file(file_path, cover_data)
 
-    if lyrics_option in (LyricsOption.LRC, LyricsOption.BOTH) and meta.lyrics:
+    if lyrics_option in (LyricsOption.LRC, LyricsOption.BOTH) and meta.synced_lyrics:
         if on_phase:
             on_phase("embedding lyrics", 95)
         _write_lrc(file_path, meta)
@@ -246,21 +246,42 @@ def _embed_cover(audio: Any, data: bytes) -> None:
 
 
 def _embed_lyrics(file_path: str, lyrics: str) -> None:
-    from mutagen.id3 import ID3, USLT
-
     audio = _load_audio(file_path)
     if audio is None:
         return
     fmt = type(audio).__name__
+
     if fmt == "MP3":
+        from mutagen.id3 import ID3, USLT
         if not isinstance(audio.tags, ID3):
             audio.add_tags()
         audio.tags.add(USLT(encoding=3, lang="eng", desc="", text=lyrics))
         audio.save()
 
+    elif fmt == "MP4":
+        # M4A/AAC: use iTunes-style lyrics tag
+        if audio.tags is None:
+            audio.add_tags()
+        audio.tags["\xa9lyr"] = lyrics
+        audio.save()
+
+    elif fmt == "FLAC":
+        # FLAC: use Vorbis comment
+        if audio.tags is None:
+            audio.add_tags()
+        audio.tags["LYRICS"] = lyrics
+        audio.save()
+
+    elif fmt == "OggOpus" or fmt == "OggVorbis":
+        # Ogg: use Vorbis comment
+        if audio.tags is None:
+            audio.add_tags()
+        audio.tags["LYRICS"] = lyrics
+        audio.save()
+
 
 def _write_lrc(file_path: str, meta: TrackMetadata) -> None:
-    if not meta.lyrics:
+    if not meta.synced_lyrics:
         return
     p = Path(file_path)
     lrc_path = p.with_suffix(".lrc")
@@ -268,7 +289,7 @@ def _write_lrc(file_path: str, meta: TrackMetadata) -> None:
     if meta.title or meta.artist:
         lines.append(f"[ti:{meta.title or ''}]")
         lines.append(f"[ar:{meta.artist or ''}]")
-    lines.append(meta.lyrics)
+    lines.append(meta.synced_lyrics)
     lrc_path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -278,80 +299,112 @@ def _save_cover_file(file_path: str, data: bytes) -> None:
     cover.write_bytes(data)
 
 
-async def _check_cover_cache(url: str) -> bytes | None:
-    """Check SQLite cache for cover art."""
-    from downtube.db.session import SessionLocal
-    from sqlalchemy import text
+def _get_db_path() -> str:
+    """Extract SQLite file path from DATABASE_URL."""
+    from downtube.config import settings
+    url = settings.database_url
+    for prefix in ("sqlite+aiosqlite:///./", "sqlite:///./", "sqlite+aiosqlite:///", "sqlite:///"):
+        if url.startswith(prefix):
+            return url[len(prefix):]
+    return url
 
-    async with SessionLocal() as db:
-        result = await db.execute(
-            text("SELECT data FROM cover_cache WHERE url = :url"), {"url": url}
+
+def _check_cover_cache_sync(url: str) -> bytes | None:
+    """Check SQLite cache for cover art (sync version for use in write_tags)."""
+    try:
+        db_path = _get_db_path()
+        conn = sqlite3.connect(db_path, timeout=5)
+        cursor = conn.execute("SELECT data FROM cover_cache WHERE url = ?", (url,))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
+def _save_cover_cache_sync(url: str, data: bytes) -> None:
+    """Save cover art to SQLite cache (sync version for use in write_tags)."""
+    try:
+        db_path = _get_db_path()
+        conn = sqlite3.connect(db_path, timeout=5)
+        conn.execute(
+            "INSERT OR REPLACE INTO cover_cache (url, data, created_at) VALUES (?, ?, ?)",
+            (url, data, datetime.now(timezone.utc).isoformat()),
         )
-        row = result.fetchone()
-        if row:
-            return row[0]
-    return None
-
-
-async def _save_cover_cache(url: str, data: bytes) -> None:
-    """Save cover art to SQLite cache."""
-    from downtube.db.session import SessionLocal
-    from sqlalchemy import text
-
-    async with SessionLocal() as db:
-        await db.execute(
-            text("INSERT OR REPLACE INTO cover_cache (url, data, created_at) VALUES (:url, :data, :created_at)"),
-            {"url": url, "data": data, "created_at": datetime.utcnow()}
-        )
-        await db.commit()
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass  # Cache failure is non-fatal
 
 
 def _fetch_cover_cached(url: str) -> bytes | None:
-    """Fetch cover art with SQLite cache to reduce RAM usage on low-power devices."""
+    """Fetch cover art with SQLite cache.
+
+    Priority: cache → URL fetch → resize → save cache.
+    Uses sync sqlite3 for cache access (called from write_tags via asyncio.to_thread).
+    """
+    # 1. Check cache first
+    cached = _check_cover_cache_sync(url)
+    if cached:
+        return cached
+
     try:
-        # Check cache first
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                cached_data = loop.run_until_complete(_check_cover_cache(url))
-                loop.close()
-            else:
-                cached_data = loop.run_until_complete(_check_cover_cache(url))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            cached_data = loop.run_until_complete(_check_cover_cache(url))
-            loop.close()
-
-        if cached_data:
-            return cached_data
-
-        # Fetch from URL
+        # 2. Fetch from URL
         with urllib.request.urlopen(url, timeout=15) as resp:
             data = resp.read()
 
-        # Save to cache
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(_save_cover_cache(url, data))
-                loop.close()
-            else:
-                loop.run_until_complete(_save_cover_cache(url, data))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(_save_cover_cache(url, data))
-            loop.close()
+        # 3. Resize if needed (min 500px, max 1500px for low-power devices)
+        data = _resize_cover_if_needed(data, min_size=500, max_size=1500)
+
+        # 4. Save to cache
+        _save_cover_cache_sync(url, data)
 
         return data
-
     except Exception:
         return None
+
+
+def _resize_cover_if_needed(data: bytes, min_size: int = 500, max_size: int = 1500) -> bytes:
+    """Resize cover art to reasonable dimensions.
+
+    - Upscale if smaller than min_size (maintains aspect ratio)
+    - Downscale if larger than max_size (saves storage on low-power devices)
+    - Output quality: JPEG 95%
+    """
+    try:
+        from io import BytesIO
+        from PIL import Image
+
+        img = Image.open(BytesIO(data))
+        width, height = img.size
+
+        # Already in good range
+        if min_size <= width <= max_size and min_size <= height <= max_size:
+            return data
+
+        # Calculate new size maintaining aspect ratio
+        if width > max_size or height > max_size:
+            # Downscale to max_size
+            scale = max_size / max(width, height)
+            new_width = int(width * scale)
+            new_height = int(height * scale)
+        elif width < min_size or height < min_size:
+            # Upscale to min_size
+            if width < height:
+                new_width = min_size
+                new_height = int(height * min_size / width)
+            else:
+                new_height = min_size
+                new_width = int(width * min_size / height)
+        else:
+            return data
+
+        img = img.resize((new_width, new_height), Image.LANCZOS)
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=95)
+        return buffer.getvalue()
+    except Exception:
+        return data
 
 
 def _fetch_cover(url: str) -> bytes | None:

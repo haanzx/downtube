@@ -8,6 +8,7 @@ class DownloadRequest(BaseModel):
     title: str | None = None
     artist: str | None = None
     album: str | None = None
+    cover_url: str | None = None
     format: str | None = None
     quality: str | None = None
     cover_option: str | None = None

@@ -20,6 +20,7 @@ dist/
 # Runtime data
 /data/
 /music/
+backend/data/
 backend/music/
 *.log
 

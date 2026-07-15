@@ -3,6 +3,8 @@
 `search()` maps the filter to ytmusicapi's `filter` param and normalises
 results for the frontend. ytmusicapi is imported lazily so the module
 can be imported without the dependency installed at import-time.
+
+Includes duration-based audio matching for Spotify→YouTube matching.
 """
 
 from typing import Any
@@ -62,6 +64,24 @@ def _normalise(item: dict, kind: str) -> dict[str, Any]:
     }
 
 
+def _parse_duration_str(duration: Any) -> int | None:
+    """Parse duration string (e.g., '3:45' or 225) to seconds."""
+    if isinstance(duration, (int, float)):
+        return int(duration)
+    if not isinstance(duration, str):
+        return None
+
+    parts = duration.split(":")
+    try:
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        elif len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except (ValueError, TypeError):
+        return None
+    return None
+
+
 class YtmProvider:
     name = "ytmusic"
 
@@ -89,6 +109,42 @@ class YtmProvider:
 
         return await asyncio.to_thread(self.search_sync, query, kind, limit)
 
+    async def search_by_duration(
+        self,
+        title: str,
+        artist: str,
+        target_duration: int,
+        tolerance: int = 10,
+    ) -> dict[str, Any] | None:
+        """Search YTMusic and match by duration.
+
+        Picks the best result by comparing audio duration.
+        Falls back to first result if no exact match.
+
+        Args:
+            title: Track title
+            artist: Artist name
+            target_duration: Target duration in seconds
+            tolerance: Duration tolerance in seconds (default: 10)
+
+        Returns:
+            Best matching result or None
+        """
+        query = f"{artist} {title}" if artist else title
+        results = await self.search(query, kind="songs", limit=10)
+
+        if not results:
+            return None
+
+        # Try to find duration match
+        for r in results:
+            yt_duration = _parse_duration_str(r.get("duration"))
+            if yt_duration is not None and abs(yt_duration - target_duration) <= tolerance:
+                return r
+
+        # Fallback to first result
+        return results[0]
+
     async def get_metadata(self, source_id: str) -> Any:
         raise NotImplementedError("metadata via ytmusicapi is implemented in P3")
 
@@ -106,10 +162,38 @@ class YtmProvider:
                 "video_id": t.get("videoId", ""),
                 "title": t.get("title", ""),
                 "artist": _artist_name(t),
+                "thumbnail": _thumb_url(t.get("thumbnails", [])),
             }
             for t in raw
             if t.get("videoId")
         ]
+
+    async def get_lyrics(self, video_id: str) -> str | None:
+        """Get lyrics for a song by video ID.
+
+        Uses ytmusicapi to fetch lyrics from YouTube Music.
+        Returns plain lyrics text or None if not available.
+        """
+        import asyncio
+
+        def _fetch_lyrics() -> str | None:
+            try:
+                client = self._client()
+                # Get watch playlist to find lyrics browseId
+                watch = client.get_watch_playlist(video_id)
+                lyrics_browse_id = watch.get("lyrics")
+                if not lyrics_browse_id:
+                    return None
+
+                # Get lyrics content
+                lyrics = client.get_lyrics(lyrics_browse_id)
+                if lyrics and lyrics.lyrics:
+                    return lyrics.lyrics
+                return None
+            except Exception:
+                return None
+
+        return await asyncio.to_thread(_fetch_lyrics)
 
     async def resolve(self, url: str) -> Any:
         raise NotImplementedError

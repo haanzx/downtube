@@ -1,6 +1,6 @@
 """Resolve a URL to the appropriate provider.
 
-URL routing: YouTube Music / YouTube -> ytdlp, Spotify -> spotify.
+URL routing via provider registry: YouTube -> ytdlp, YouTube Music -> ytmusic, Spotify -> embed scraper.
 The actual provider instances are wired in services; this module only
 classifies the URL so the rest of the code stays provider-agnostic.
 """

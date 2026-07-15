@@ -39,43 +39,93 @@ def _extract_playlist_id(url: str) -> str:
     raise ValueError(f"Gagal ekstrak playlist ID dari URL: {url}")
 
 
+def _is_spotify_url(url: str) -> bool:
+    return any(d in url for d in ("open.spotify.com", "spotify.link"))
+
+
 async def sync_playlist(session: AsyncSession, pid: int, music_root: Path) -> dict:
     p = await pl_repo.get_playlist(session, pid)
     if not p:
         raise ValueError("Playlist tidak ditemukan")
 
-    provider = YtmProvider()
-    pl_id = _extract_playlist_id(p.url)
-    remote_items = await provider.get_playlist_items(pl_id)
-
     existing = await pl_repo.get_playlist_items(session, pid)
     existing_ids = {item.video_id for item in existing}
-    new_items = [it for it in remote_items if it["video_id"] not in existing_ids]
+    new_items = []
+    playlist_name = p.name
 
-    queued = []
-    for item in new_items:
-        url_yt = f"https://www.youtube.com/watch?v={item['video_id']}"
-        qid = await queue_repo.add_item(
-            session,
-            url=url_yt,
-            title=item.get("title", ""),
-            format=p.format,
-            quality="best",
-        )
-        queued.append({"id": qid, "video_id": item["video_id"], "title": item.get("title", "")})
+    if _is_spotify_url(p.url):
+        # Spotify playlist
+        from downtube.providers.spotify_embed import scrape_playlist
 
-        item_row = {
-            "video_id": item["video_id"],
-            "title": item.get("title", ""),
-            "artist": item.get("artist", ""),
-        }
-        await pl_repo.add_playlist_items(session, pid, [item_row])
+        embed_name, tracks = await scrape_playlist(p.url)
+        playlist_name = embed_name
+
+        for track in tracks:
+            video_id = track.get("song_id", "")
+            if not video_id or video_id in existing_ids:
+                continue
+
+            # Search YTMusic by duration
+            ytm = YtmProvider()
+            match = await ytm.search_by_duration(
+                track.get("name", ""),
+                track.get("artist", ""),
+                track.get("duration", 0),
+            )
+            if match:
+                yt_video_id = match["id"]
+                url_yt = f"https://www.youtube.com/watch?v={yt_video_id}"
+                await queue_repo.add_item(
+                    session,
+                    url=url_yt,
+                    title=track.get("name", ""),
+                    artist=track.get("artist", ""),
+                    cover_url=track.get("cover_url") or match.get("thumbnail"),
+                    format=p.format,
+                    quality="best",
+                )
+                new_items.append({
+                    "video_id": yt_video_id,
+                    "title": track.get("name", ""),
+                    "artist": track.get("artist", ""),
+                })
+    else:
+        # YouTube playlist
+        provider = YtmProvider()
+        pl_id = _extract_playlist_id(p.url)
+        remote_items = await provider.get_playlist_items(pl_id)
+
+        for item in remote_items:
+            vid = item["video_id"]
+            if vid in existing_ids:
+                continue
+
+            url_yt = f"https://www.youtube.com/watch?v={vid}"
+            await queue_repo.add_item(
+                session,
+                url=url_yt,
+                title=item.get("title", ""),
+                artist=item.get("artist", ""),
+                cover_url=item.get("thumbnail"),
+                format=p.format,
+                quality="best",
+            )
+            new_items.append({
+                "video_id": vid,
+                "title": item.get("title", ""),
+                "artist": item.get("artist", ""),
+            })
+
+    # Add to playlist_items
+    if new_items:
+        await pl_repo.add_playlist_items(session, pid, new_items)
 
     await pl_repo.update_playlist_sync(session, pid, datetime.utcnow())
 
     return {
-        "total_remote": len(remote_items),
+        "playlist_name": playlist_name,
+        "total_remote": len(new_items) + len(existing_ids),
         "already_synced": len(existing_ids),
-        "new_queued": len(queued),
-        "items": queued,
+        "new_queued": len(new_items),
+        "items": new_items,
     }

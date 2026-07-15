@@ -36,7 +36,7 @@ onUnmounted(() => close());
 const activeItems = computed(() =>
   items.value.filter((i) => {
     const s = getStatus(i);
-    return s === "pending" || s === "downloading";
+    return s === "pending" || s === "resolving" || s === "downloading" || s === "transcoding" || s === "tagging";
   }),
 );
 const doneItems = computed(() => items.value.filter((i) => getStatus(i) === "done"));
@@ -46,9 +46,12 @@ const PHASE_LABELS: Record<string, string> = {
   resolving: "Mengambil info...",
   downloading: "Mengunduh...",
   transcoding: "Transcode...",
+  "fetching_lyrics": "Mengambil lirik...",
+  "fetching_cover": "Mengambil cover...",
+  "writing metadata": "Menulis metadata...",
   "embedding cover": "Menanam cover...",
   "embedding lyrics": "Menanam lirik...",
-  "writing metadata": "Menulis metadata...",
+  tagging: "Menanam metadata...",
   done: "Selesai",
 };
 

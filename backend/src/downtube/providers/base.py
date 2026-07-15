@@ -17,7 +17,9 @@ class TrackMetadata:
     genre: str | None = None
     release_date: str | None = None
     cover_url: str | None = None
+    cover_source: str | None = None  # "spotify" | "musicbrainz" | "ytmusic" | None
     lyrics: str | None = None
+    synced_lyrics: str | None = None
     duration: float | None = None
     source_id: str | None = None
     provider: str | None = None

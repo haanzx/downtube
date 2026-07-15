@@ -87,8 +87,8 @@ async function handleDelete(id: number) {
           <input v-model="newName" placeholder="Playlist favorit saya" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
         </div>
         <div>
-          <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">URL YouTube playlist</label>
-          <input v-model="newUrl" placeholder="https://youtube.com/playlist?list=..." class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
+          <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">URL Playlist (YouTube atau Spotify)</label>
+          <input v-model="newUrl" placeholder="https://youtube.com/playlist?list=... atau https://open.spotify.com/playlist/..." class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
         </div>
         <div class="flex gap-2">
           <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">Simpan</button>
@@ -104,7 +104,7 @@ async function handleDelete(id: number) {
       <svg class="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h10M4 18h6" />
       </svg>
-      <p class="mt-3 text-sm text-slate-400">Belum ada playlist. Tambahkan playlist YouTube.</p>
+      <p class="mt-3 text-sm text-slate-400">Belum ada playlist. Tambahkan playlist YouTube atau Spotify.</p>
     </div>
 
     <!-- List -->

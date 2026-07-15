@@ -24,6 +24,7 @@ async def enqueue(db: AsyncSession, payload: DownloadRequest) -> QueueItem:
         title=payload.title,
         artist=payload.artist,
         album=payload.album,
+        cover_url=payload.cover_url,
         format=fmt,
         quality=quality,
         cover_option=cover,

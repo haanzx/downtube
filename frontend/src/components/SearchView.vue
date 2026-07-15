@@ -42,6 +42,7 @@ async function handleEnqueueFromResult(result: SearchResult) {
       title: result.title,
       artist: result.artist,
       album: result.album,
+      cover_url: result.thumbnail,
     });
     feedback.value = `"${result.title}" ditambahkan ke unduhan.`;
     emit("downloaded");
@@ -61,6 +62,7 @@ async function handleEnqueuePreview() {
       title: preview.value.title,
       artist: preview.value.artist,
       album: preview.value.album,
+      cover_url: preview.value.thumbnail,
     });
     feedback.value = `"${preview.value.title}" ditambahkan ke unduhan.`;
     preview.value = null;

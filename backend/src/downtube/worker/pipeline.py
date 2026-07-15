@@ -1,7 +1,14 @@
 """Download pipeline: explicit stages for the download process.
 
-Each stage is a separate class with a clear responsibility, making
-the pipeline easier to debug, test, and extend.
+5-stage pipeline:
+1. Resolve: Spotify embed → metadata + YTMusic duration match / YouTube direct info
+2. Download: yt-dlp audio download
+3. Lyrics: Fetch synced/plain lyrics
+4. Cover: MusicBrainz upgrade (keep search thumbnail as baseline)
+5. Tag: mutagen metadata embedding
+
+Cover art priority: Spotify embed > MusicBrainz CAA > Search thumbnail (1:1 square).
+Do NOT use YouTube 16:9 thumbnails as fallback.
 """
 
 from __future__ import annotations
@@ -12,11 +19,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from downtube.config import settings
-from downtube.db.models import QueueItem, QueueStatus
+from downtube.db.models import QueueItem
 from downtube.db.session import SessionLocal
 from downtube.providers.base import TrackMetadata
 from downtube.providers.ytdlp import YtdlpProvider
-from downtube.worker.sse import broker
 
 _UNSAFE = re.compile(r'[\\/:*?"<>|]')
 
@@ -82,52 +88,97 @@ class PipelineStage:
 
 
 class ResolveStage(PipelineStage):
-    """Resolve URL to metadata and download URL."""
+    """Resolve URL to metadata and download URL.
+
+    For Spotify: scrape embed page → duration match → YTMusic
+    For YouTube: direct info fetch
+    """
 
     name = "resolving"
     phase_label = "Mengambil info..."
 
     async def run(self, ctx: PipelineContext) -> None:
-        from downtube.providers.router import provider_for_url
-        from downtube.providers.spotify import SpotifyProvider
+        from downtube.providers.spotify_embed import is_spotify, scrape_track
+        from downtube.providers.ytmusic import YtmProvider
 
-        provider_name = provider_for_url(ctx.item.url)
+        url = ctx.item.url
 
-        if provider_name == "spotify":
-            sp = SpotifyProvider()
-            meta, yt_url = await sp.resolve_and_match(ctx.item.url)
-            if not yt_url:
+        if is_spotify(url):
+            # 1. Scrape Spotify embed page (cepat, ~0.5 detik)
+            meta = await scrape_track(url)
+
+            # 2. Search YTMusic by duration (cepat, ~1 detik)
+            ytm = YtmProvider()
+            yt_match = await ytm.search_by_duration(
+                meta["name"],
+                meta["artists"][0] if meta["artists"] else "",
+                meta["duration"],
+            )
+
+            if not yt_match:
                 raise ValueError(
-                    f"Tidak bisa mencocokkan ke YouTube: {meta.artist} - {meta.title}"
+                    f"Tidak bisa mencocokkan ke YouTube: {meta['artist']} - {meta['name']}"
                 )
-            ytdlp = YtdlpProvider()
-            ctx.info = await ytdlp.get_info(yt_url)
-            ctx.download_url = yt_url
-            ctx.meta = meta
+
+            # 3. Set download URL + metadata
+            ctx.download_url = f"https://www.youtube.com/watch?v={yt_match['id']}"
+            ctx.meta = TrackMetadata(
+                title=meta["name"],
+                artist=meta["artist"],
+                album=meta.get("album_name"),
+                cover_url=meta.get("cover_url"),
+                cover_source="spotify",
+                duration=meta.get("duration"),
+                release_date=meta.get("release_date"),
+                source_id=meta.get("song_id"),
+                provider="spotify",
+            )
+
             await ctx.update_metadata(
-                title=meta.title,
-                artist=meta.artist,
-                album=meta.album,
-                source_id=ctx.info.get("id"),
-                cover_url=meta.cover_url,
+                title=meta["name"],
+                artist=meta["artist"],
+                album=meta.get("album_name"),
+                source_id=meta.get("song_id"),
+                cover_url=meta.get("cover_url"),
             )
         else:
+            # YouTube URL - direct info fetch
             ytdlp = YtdlpProvider()
-            ctx.info = await ytdlp.get_info(ctx.item.url)
-            ctx.download_url = ctx.item.url
+            ctx.info = await ytdlp.get_info(url)
+            ctx.download_url = url
 
             artist = ctx.info.get("artist") or ctx.info.get("uploader")
             title = ctx.info.get("title") or "untitled"
             display = f"{artist} - {title}" if artist else title
             vid = ctx.info.get("id", "")
-            yt_cover = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else None
+
+            # Use cover_url from QueueItem (search thumbnail, 1:1 square)
+            # Do NOT fallback to YouTube 16:9 thumbnail
+            cover_url = ctx.item.cover_url or None
+            cover_source = "ytmusic" if cover_url else None
+
+            ctx.meta = TrackMetadata(
+                title=title,
+                artist=artist,
+                album=ctx.info.get("album"),
+                album_artist=artist,
+                track_number=_to_int(ctx.info.get("track_number")),
+                disc_number=_to_int(ctx.info.get("disc_number")),
+                genre=ctx.info.get("genre"),
+                release_date=ctx.info.get("upload_date"),
+                cover_url=cover_url,
+                cover_source=cover_source,
+                duration=ctx.info.get("duration"),
+                source_id=vid,
+                provider="ytdlp",
+            )
 
             await ctx.update_metadata(
                 title=display,
                 artist=artist,
                 album=ctx.info.get("album"),
                 source_id=ctx.info.get("id"),
-                cover_url=yt_cover,
+                cover_url=cover_url,
             )
 
 
@@ -158,16 +209,96 @@ class DownloadStage(PipelineStage):
         )
 
 
-class TranscodeStage(PipelineStage):
-    """Transcode is handled by yt-dlp internally. This stage is a placeholder."""
+class LyricsStage(PipelineStage):
+    """Fetch lyrics for the downloaded track."""
 
-    name = "transcoding"
-    phase_label = "Transcode audio..."
+    name = "fetching_lyrics"
+    phase_label = "Mengambil lirik..."
 
     async def run(self, ctx: PipelineContext) -> None:
-        # yt-dlp handles transcoding during download
-        # This stage exists for pipeline completeness
-        pass
+        from downtube.providers.lyrics import fetch_lyrics, fetch_synced_lyrics
+
+        # Skip if lyrics option is none
+        if ctx.item.lyrics_option == "none":
+            return
+
+        # Get video_id from context
+        video_id = None
+        if ctx.meta and ctx.meta.source_id:
+            video_id = ctx.meta.source_id
+        elif ctx.info.get("id"):
+            video_id = ctx.info.get("id")
+
+        # Get title and artist for fallback
+        title = ctx.meta.title if ctx.meta else ctx.info.get("title")
+        artist = ctx.meta.artist if ctx.meta else (ctx.info.get("artist") or ctx.info.get("uploader"))
+        duration = int(ctx.meta.duration) if ctx.meta and ctx.meta.duration else None
+
+        # Fetch plain lyrics (for USLT embed)
+        lyrics = await fetch_lyrics(
+            video_id=video_id,
+            title=title,
+            artist=artist,
+            duration=duration,
+        )
+
+        if lyrics and ctx.meta:
+            ctx.meta.lyrics = lyrics
+
+        # Fetch synced lyrics (for LRC file)
+        if ctx.item.lyrics_option in ("lrc", "both"):
+            synced = await fetch_synced_lyrics(
+                video_id=video_id,
+                title=title,
+                artist=artist,
+                duration=duration,
+            )
+            if synced and ctx.meta:
+                ctx.meta.synced_lyrics = synced
+
+
+class CoverStage(PipelineStage):
+    """Fetch cover art with priority chain:
+    1. Spotify embed (1:1 square, high quality) — skip if already set
+    2. MusicBrainz CAA (full resolution, 1:1 square) — upgrade if found
+    3. Keep search thumbnail (1:1 square, ~720x720) — do NOT fallback to YouTube 16:9
+    """
+
+    name = "fetching_cover"
+    phase_label = "Mengambil cover..."
+
+    async def run(self, ctx: PipelineContext) -> None:
+        # 1. Skip if cover is already from Spotify (highest quality, 1:1 square)
+        if ctx.meta and ctx.meta.cover_source == "spotify":
+            return
+
+        # Skip if no metadata
+        if not ctx.meta:
+            return
+
+        artist = ctx.meta.artist or ""
+        title = ctx.meta.title or ""
+        if not title:
+            return
+
+        # 2. Try MusicBrainz CAA (full resolution, 1:1 square) — only upgrade
+        try:
+            from downtube.providers.musicbrainz import musicbrainz_cover
+            cover_url = await musicbrainz_cover.search_cover(artist, title)
+            if cover_url:
+                ctx.meta.cover_url = cover_url
+                ctx.meta.cover_source = "musicbrainz"
+                async with SessionLocal() as db:
+                    item = await db.get(QueueItem, ctx.item.id)
+                    if item is not None:
+                        item.cover_url = cover_url
+                        await db.commit()
+                return
+        except Exception:
+            pass
+
+        # 3. Keep existing cover_url (search thumbnail, 1:1 square)
+        # Do NOT fallback to YouTube maxresdefault (16:9)
 
 
 class MetadataStage(PipelineStage):
@@ -179,10 +310,12 @@ class MetadataStage(PipelineStage):
     async def run(self, ctx: PipelineContext) -> None:
         from downtube.providers.tagger import CoverOption, LyricsOption, write_tags
 
-        vid = ctx.info.get("id", "")
-
+        # Use metadata from pipeline context if available
         if ctx.meta is None:
-            cover_url = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg" if vid else None
+            vid = ctx.info.get("id", "")
+            # Use cover_url from QueueItem only (search thumbnail, 1:1 square)
+            # Do NOT fallback to YouTube 16:9 thumbnail
+            cover_url = ctx.item.cover_url or None
             ctx.meta = TrackMetadata(
                 title=ctx.info.get("title"),
                 artist=ctx.info.get("artist") or ctx.info.get("uploader"),
@@ -198,8 +331,10 @@ class MetadataStage(PipelineStage):
                 provider="ytdlp",
             )
         else:
-            if not ctx.meta.cover_url and vid:
-                ctx.meta.cover_url = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
+            # Ensure cover URL exists from QueueItem (search thumbnail)
+            # Do NOT fallback to YouTube 16:9 thumbnail
+            if not ctx.meta.cover_url:
+                ctx.meta.cover_url = ctx.item.cover_url or None
 
         cover_opt = CoverOption(ctx.item.cover_option)
         lyrics_opt = LyricsOption(ctx.item.lyrics_option)
@@ -217,12 +352,13 @@ class MetadataStage(PipelineStage):
 
 
 class DownloadPipeline:
-    """Orchestrates the download pipeline stages."""
+    """5-stage pipeline: Resolve → Download → Lyrics → Cover → Tag."""
 
     stages: list[PipelineStage] = [
         ResolveStage(),
         DownloadStage(),
-        TranscodeStage(),
+        LyricsStage(),
+        CoverStage(),
         MetadataStage(),
     ]
 
@@ -262,7 +398,8 @@ class DownloadPipeline:
         progress_map = {
             "resolving": 5.0,
             "downloading": 10.0,
-            "transcoding": 87.0,
+            "fetching_lyrics": 88.0,
+            "fetching_cover": 90.0,
             "tagging": 92.0,
         }
         return progress_map.get(stage_name, 0.0)
