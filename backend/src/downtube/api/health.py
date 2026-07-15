@@ -64,14 +64,13 @@ async def _check_ytdlp() -> dict:
 async def _check_music_dir() -> dict:
     """Check music directory write permission."""
     try:
+        import os
         root = settings.music_root
         if not root.exists():
             root.mkdir(parents=True, exist_ok=True)
-        # Test write permission
-        test_file = root / ".write_test"
-        test_file.write_text("test")
-        test_file.unlink()
-        return {"status": "ok", "path": str(root)}
+        if os.access(root, os.W_OK):
+            return {"status": "ok", "path": str(root)}
+        return {"status": "error", "detail": "No write permission"}
     except Exception as e:
         return {"status": "error", "detail": str(e)[:200]}
 

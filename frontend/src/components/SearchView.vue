@@ -11,6 +11,7 @@ const preview = ref<PreviewResult | null>(null);
 const loading = ref(false);
 const enqueueing = ref<string | null>(null);
 const feedback = ref("");
+const hasSearched = ref(false);
 
 function isUrl(text: string): boolean {
   return /^https?:\/\//.test(text.trim());
@@ -22,6 +23,7 @@ async function doSearch() {
   loading.value = true;
   preview.value = null;
   feedback.value = "";
+  hasSearched.value = true;
 
   if (isUrl(q)) {
     const p = await previewUrl(q);
@@ -80,141 +82,204 @@ function clear() {
   results.value = [];
   preview.value = null;
   feedback.value = "";
+  hasSearched.value = false;
+}
+
+const categories = [
+  { key: "song", label: "Lagu", icon: "music", color: "bg-neutral-400" },
+  { key: "album", label: "Album", icon: "disc", color: "bg-neutral-500" },
+  { key: "artist", label: "Artis", icon: "mic", color: "bg-neutral-600" },
+  { key: "playlist", label: "Playlist", icon: "list", color: "bg-neutral-700" },
+];
+
+function selectCategory(key: string) {
+  searchType.value = key;
 }
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl px-6 py-8 space-y-6">
-    <header>
-      <h1 class="text-2xl font-bold tracking-tight">Cari</h1>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Cari lagu, artis, atau tempel tautan YouTube / YT Music / Spotify
+  <div class="mx-auto max-w-4xl px-6 py-8 space-y-8">
+    <!-- Big Search Section -->
+    <div class="flex flex-col items-center text-center">
+      <h1 class="mb-2 text-4xl font-bold tracking-tight">Cari Musik</h1>
+      <p class="mb-8 text-base text-black/40 dark:text-white/40">
+        Ketik judul lagu, nama artis, atau tempel tautan
       </p>
-    </header>
 
-    <!-- Search bar -->
-    <div class="flex gap-3">
-      <div class="relative flex-1">
-        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          v-model="query"
-          @keydown.enter="doSearch"
-          placeholder="Cari lagu, artis, atau tempel tautan..."
-          class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm transition-colors placeholder:text-slate-400 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-700 dark:bg-slate-800 dark:focus:border-white dark:focus:ring-white/10"
-        />
+      <!-- Big Search Bar -->
+      <div class="flex w-full max-w-2xl items-center gap-3">
+        <div class="relative flex-1">
+          <svg class="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black/40 dark:text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            v-model="query"
+            @keydown.enter="doSearch"
+            placeholder="Cari lagu, artis, atau tempel tautan..."
+            aria-label="Cari lagu atau tempel tautan"
+            class="h-12 w-full rounded-full border border-black/5 bg-am-surface-light pl-12 pr-5 text-base transition-all duration-200 placeholder:text-black/40 focus:border-am-accent-light focus:outline-none focus:ring-4 focus:ring-am-accent-light/10 dark:border-white/5 dark:bg-am-surface-dark dark:placeholder:text-white/40 dark:focus:border-am-accent-dark dark:focus:ring-am-accent-dark/10"
+          />
+        </div>
+        <button
+          @click="doSearch"
+          :disabled="!query.trim() || loading"
+          :aria-busy="loading"
+          class="h-12 shrink-0 rounded-full bg-am-accent-light px-7 text-base font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98] disabled:opacity-40 dark:bg-am-accent-dark"
+        >
+          {{ loading ? "..." : "Cari" }}
+        </button>
       </div>
-      <select
-        v-model="searchType"
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm transition-colors focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-700 dark:bg-slate-800 dark:focus:border-white dark:focus:ring-white/10"
-      >
-        <option value="song">Lagu</option>
-        <option value="album">Album</option>
-        <option value="artist">Artis</option>
-        <option value="playlist">Playlist</option>
-      </select>
-      <button
-        @click="doSearch"
-        :disabled="!query.trim() || loading"
-        class="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-40 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-      >
-        {{ loading ? "..." : "Cari" }}
-      </button>
+
+      <!-- Type Selector -->
+      <div class="mt-4 flex gap-2">
+        <button
+          v-for="cat in categories"
+          :key="cat.key"
+          @click="selectCategory(cat.key)"
+          :class="[
+            'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-150',
+            searchType === cat.key
+              ? 'bg-am-accent-light text-white dark:bg-am-accent-dark'
+              : 'bg-am-surface-light text-black/40 hover:bg-black/5 dark:bg-am-surface-dark dark:text-white/40 dark:hover:bg-white/5',
+          ]"
+        >
+          <span :class="['h-2 w-2 rounded-full', cat.color]" />
+          {{ cat.label }}
+        </button>
+      </div>
     </div>
 
-    <p v-if="feedback" class="animate-fade-in text-sm text-emerald-600 dark:text-emerald-400">
+    <!-- Feedback -->
+    <p v-if="feedback" role="status" aria-live="polite" class="animate-fade-in text-center text-sm font-medium text-am-accent-light dark:text-am-accent-dark">
       {{ feedback }}
     </p>
 
     <!-- URL Preview -->
-    <div v-if="preview" class="animate-slide-up rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-      <div class="flex items-start gap-4">
-        <img v-if="preview.thumbnail" :src="preview.thumbnail" class="h-20 w-20 rounded-xl object-cover" />
-        <div v-else class="flex h-20 w-20 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
-          <svg class="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-          </svg>
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-base font-semibold">{{ preview.title }}</p>
-          <p class="mt-0.5 truncate text-sm text-slate-500 dark:text-slate-400">
-            {{ preview.artist || "Tanpa artis" }}
-            <template v-if="preview.album"> &middot; {{ preview.album }} </template>
-          </p>
-          <p class="mt-0.5 text-xs text-slate-400">
-            <template v-if="preview.year">{{ preview.year }} &middot; </template>
-            <template v-if="preview.duration">{{ preview.duration }}</template>
-          </p>
-        </div>
-      </div>
-      <div class="mt-4 flex gap-2">
-        <button
-          @click="handleEnqueuePreview"
-          :disabled="enqueueing === 'preview'"
-          class="rounded-xl bg-slate-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-40 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-        >
-          {{ enqueueing === "preview" ? "Menambahkan..." : "Unduh" }}
-        </button>
-        <button
-          @click="clear"
-          class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
-        >
-          Batal
-        </button>
-      </div>
-    </div>
-
-    <!-- Search Results -->
-    <section v-if="results.length > 0" class="animate-slide-up">
-      <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-sm font-medium text-slate-500 dark:text-slate-400">
-          {{ results.length }} hasil
-        </h2>
-        <button @click="clear" class="text-xs text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300">
-          Bersihkan
-        </button>
-      </div>
-      <div class="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800">
-        <div
-          v-for="result in results"
-          :key="result.id"
-          class="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50"
-        >
-          <img v-if="result.thumbnail" :src="result.thumbnail" class="h-10 w-10 rounded-lg object-cover" loading="lazy" />
-          <div v-else class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700">
-            <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <div v-if="preview" class="animate-slide-up">
+      <div class="mx-auto max-w-2xl overflow-hidden rounded-3xl border border-black/5 bg-am-surface-light shadow-sm shadow-black/5 dark:border-white/5 dark:bg-am-surface-dark dark:shadow-black/5">
+        <div class="flex items-start gap-5 p-6">
+          <img v-if="preview.thumbnail" :src="preview.thumbnail" :alt="`${preview.title} cover`" class="h-28 w-28 shrink-0 rounded-2xl object-cover shadow-sm" />
+          <div v-else class="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl bg-black/5 dark:bg-white/5">
+            <svg class="h-10 w-10 text-black/40 dark:text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-medium">{{ result.title }}</p>
-            <p class="truncate text-xs text-slate-500 dark:text-slate-400">
-              {{ result.artist || "Tanpa artis" }}
-              <template v-if="result.album"> &middot; {{ result.album }} </template>
-              <template v-if="result.duration"> &middot; {{ result.duration }} </template>
+          <div class="min-w-0 flex-1 pt-1">
+            <p class="truncate text-xl font-bold">{{ preview.title }}</p>
+            <p class="mt-1 truncate text-base text-black/40 dark:text-white/40">
+              {{ preview.artist || "Tanpa artis" }}
+              <template v-if="preview.album"> &middot; {{ preview.album }} </template>
+            </p>
+            <p class="mt-1 text-sm text-black/40 dark:text-white/40">
+              <template v-if="preview.year">{{ preview.year }} &middot; </template>
+              <template v-if="preview.duration">{{ preview.duration }}</template>
             </p>
           </div>
+        </div>
+        <div class="flex gap-3 border-t border-black/5 px-6 py-4 dark:border-white/5">
           <button
-            @click="handleEnqueueFromResult(result)"
-            :disabled="enqueueing === result.id"
-            class="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            @click="handleEnqueuePreview"
+            :disabled="enqueueing === 'preview'"
+            class="rounded-full bg-am-accent-light px-6 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 dark:bg-am-accent-dark"
           >
-            {{ enqueueing === result.id ? "..." : "Unduh" }}
+            {{ enqueueing === "preview" ? "Menambahkan..." : "Unduh" }}
           </button>
+          <button
+            @click="clear"
+            class="rounded-full border border-black/5 px-6 py-2.5 text-sm font-semibold text-black/40 transition-colors hover:bg-black/5 dark:border-white/5 dark:text-white/40 dark:hover:bg-white/5"
+          >
+            Batal
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Results - Card Grid -->
+    <section v-if="results.length > 0" class="animate-slide-up" aria-label="Hasil pencarian">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">{{ results.length }} hasil</h2>
+        <button @click="clear" class="text-sm font-medium text-black/40 transition-colors hover:text-black/90 dark:text-white/40 dark:hover:text-white/90">
+          Bersihkan
+        </button>
+      </div>
+      <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div
+          v-for="result in results"
+          :key="result.id"
+          class="group cursor-pointer overflow-hidden rounded-3xl border border-black/5 bg-am-surface-light p-3 transition-all duration-200 hover:shadow-md hover:shadow-black/5 hover:dark:shadow-black/10 dark:border-white/5 dark:bg-am-surface-dark"
+        >
+          <!-- Cover Art -->
+          <div class="relative mb-3 aspect-square overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5">
+            <img v-if="result.thumbnail" :src="result.thumbnail" :alt="`${result.title} thumbnail`" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+            <div v-else class="flex h-full w-full items-center justify-center">
+              <svg class="h-12 w-12 text-black/15 dark:text-white/15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </div>
+            <!-- Download Button Overlay -->
+            <button
+              @click="handleEnqueueFromResult(result)"
+              :disabled="enqueueing === result.id"
+              class="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-am-accent-light text-white opacity-0 shadow-lg transition-all duration-200 group-hover:opacity-100 hover:scale-105 active:scale-95 disabled:opacity-40 dark:bg-am-accent-dark"
+            >
+              <svg v-if="enqueueing !== result.id" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4" />
+              </svg>
+              <svg v-else class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </button>
+          </div>
+          <!-- Info -->
+          <p class="truncate text-[15px] font-semibold">{{ result.title }}</p>
+          <p class="mt-0.5 truncate text-sm text-black/40 dark:text-white/40">
+            {{ result.artist || "Tanpa artis" }}
+          </p>
+          <p v-if="result.duration" class="mt-0.5 text-xs text-black/30 dark:text-white/30">
+            {{ result.duration }}
+          </p>
         </div>
       </div>
     </section>
 
-    <!-- Empty state -->
+    <!-- Empty state / Browse Categories -->
     <div
-      v-if="!loading && results.length === 0 && !preview"
-      class="rounded-xl border border-dashed border-slate-300 py-16 text-center dark:border-slate-700"
+      v-if="!loading && results.length === 0 && !preview && !hasSearched"
+      class="animate-fade-in"
     >
-      <svg class="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <p class="mb-6 text-center text-sm text-black/40 dark:text-white/40">Atau pilih kategori pencarian</p>
+      <div class="mx-auto grid max-w-lg grid-cols-2 gap-4">
+        <button
+          v-for="cat in categories"
+          :key="cat.key"
+          @click="selectCategory(cat.key); query ? doSearch() : null"
+          :class="[
+            'group flex items-center gap-4 overflow-hidden rounded-3xl p-5 transition-all duration-200 hover:shadow-md hover:shadow-black/5 hover:dark:shadow-black/10',
+            cat.color,
+          ]"
+        >
+          <span class="text-3xl font-bold text-white/90 transition-transform duration-200 group-hover:scale-110">
+            <svg v-if="cat.icon === 'music'" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg>
+            <svg v-else-if="cat.icon === 'disc'" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z" /></svg>
+            <svg v-else-if="cat.icon === 'mic'" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1 1.93c-3.94-.49-7-3.85-7-7.93h2c0 3.31 2.69 6 6 6s6-2.69 6-6h2c0 4.08-3.06 7.44-7 7.93V20h4v2H8v-2h4v-4.07z" /></svg>
+            <svg v-else class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
+          </span>
+          <span class="text-lg font-bold text-white">{{ cat.label }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Empty search state -->
+    <div
+      v-if="!loading && results.length === 0 && !preview && hasSearched"
+      class="rounded-3xl border border-dashed border-black/5 py-16 text-center dark:border-white/5"
+    >
+      <svg class="mx-auto h-16 w-16 text-black/10 dark:text-white/10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
-      <p class="mt-3 text-sm text-slate-400">Ketik judul lagu, nama artis, atau tempel tautan</p>
+      <p class="mt-4 text-base font-medium text-black/40 dark:text-white/40">Tidak ada hasil ditemukan</p>
+      <p class="mt-1 text-sm text-black/30 dark:text-white/30">Coba kata kunci lain atau periksa URL</p>
     </div>
   </div>
 </template>

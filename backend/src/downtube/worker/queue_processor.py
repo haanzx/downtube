@@ -20,10 +20,11 @@ from downtube.worker.sse import broker
 PHASE_LABELS = {
     "resolving": "Mengambil info...",
     "downloading": "Mengunduh...",
-    "transcoding": "Transcode audio...",
-    "embedding cover": "Menanam cover...",
-    "embedding lyrics": "Menanam lirik...",
+    "fetching_lyrics": "Mengambil lirik...",
+    "fetching_cover": "Mengambil cover...",
+    "writing lyrics": "Menulis lirik...",
     "writing metadata": "Menulis metadata...",
+    "tagging": "Menanam metadata...",
     "done": "Selesai",
     "error": "Gagal",
 }
@@ -105,15 +106,6 @@ class QueueProcessor:
                     row = await db.get(QueueItem, item.id)
                     if row is not None:
                         await db.commit()
-                await broker.publish(
-                    {
-                        "id": item.id,
-                        "progress": 100.0,
-                        "status": QueueStatus.DONE.value,
-                        "phase": "done",
-                        "phase_label": "Selesai",
-                    }
-                )
             except Exception as exc:  # noqa: BLE001
                 await self._emit(item.id, None, QueueStatus.FAILED, "error")
                 async with SessionLocal() as db:
@@ -121,9 +113,6 @@ class QueueProcessor:
                     if row is not None:
                         row.error = str(exc)[:500]
                         await db.commit()
-                await broker.publish(
-                    {"id": item.id, "status": QueueStatus.FAILED.value, "phase": "error"}
-                )
 
 
 processor = QueueProcessor()

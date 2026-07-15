@@ -8,6 +8,9 @@ DEFAULTS = {
     "default_cover_option": "embed",
     "default_lyrics_option": "lrc",
     "download_concurrency": "2",
+    "low_power_mode": "false",
+    "ffmpeg_threads": "1",
+    "max_search_results": "10",
 }
 
 

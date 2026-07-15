@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import AppSidebar from "./components/AppSidebar.vue";
+import BottomTabBar from "./components/BottomTabBar.vue";
 import SearchView from "./components/SearchView.vue";
 import DownloadsView from "./components/DownloadsView.vue";
 import PlaylistsView from "./components/PlaylistsView.vue";
@@ -9,41 +10,38 @@ import SettingsView from "./components/SettingsView.vue";
 type ViewKey = "search" | "downloads" | "playlists" | "settings";
 
 const current = ref<ViewKey>("search");
-const sidebarOpen = ref(false);
+
+const pageTitles: Record<ViewKey, string> = {
+  search: "Cari",
+  downloads: "Unduhan",
+  playlists: "Playlist",
+  settings: "Pengaturan",
+};
+
+const pageTitle = computed(() => pageTitles[current.value]);
 
 function navigate(key: string) {
   current.value = key as ViewKey;
-  sidebarOpen.value = false;
 }
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
-    <!-- Sidebar -->
+  <div class="flex h-screen overflow-hidden bg-am-bg-light dark:bg-am-bg-dark">
+    <!-- Desktop sidebar -->
     <AppSidebar
       :model-value="current"
-      :open="sidebarOpen"
       @update:model-value="navigate"
-      @close="sidebarOpen = false"
     />
 
     <!-- Main -->
     <div class="flex flex-1 flex-col overflow-hidden">
-      <!-- Top bar (mobile) -->
-      <header class="flex items-center border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800 md:hidden">
-        <button
-          @click="sidebarOpen = true"
-          class="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
-        >
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-        <span class="ml-3 text-sm font-semibold">DownTube</span>
+      <!-- Top bar (mobile only) -->
+      <header class="flex items-center border-b border-black/5 bg-am-bg-light px-5 py-3 md:hidden">
+        <span class="text-lg font-bold tracking-tight">{{ pageTitle }}</span>
       </header>
 
-      <!-- Content -->
-      <main class="flex-1 overflow-y-auto">
+      <!-- Content — pb-20 on mobile for bottom tab bar -->
+      <main class="flex-1 overflow-y-auto pb-20 md:pb-0">
         <div class="animate-fade-in">
           <SearchView v-if="current === 'search'" @downloaded="navigate('downloads')" />
           <DownloadsView v-else-if="current === 'downloads'" />
@@ -53,24 +51,10 @@ function navigate(key: string) {
       </main>
     </div>
 
-    <!-- Sidebar overlay (mobile) -->
-    <Transition name="fade">
-      <div
-        v-if="sidebarOpen"
-        class="fixed inset-0 z-30 bg-black/40 md:hidden"
-        @click="sidebarOpen = false"
-      />
-    </Transition>
+    <!-- Mobile bottom tab bar -->
+    <BottomTabBar
+      :model-value="current"
+      @update:model-value="navigate"
+    />
   </div>
 </template>
-
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>

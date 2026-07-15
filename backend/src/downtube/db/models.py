@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from sqlalchemy import (
@@ -58,9 +58,9 @@ class QueueItem(Base):
     provider: Mapped[str | None] = mapped_column(String, nullable=True)
     source_id: Mapped[str | None] = mapped_column(String, nullable=True)
     output_path: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
 
 
@@ -72,7 +72,7 @@ class Playlist(Base):
     url: Mapped[str] = mapped_column(String, nullable=False)
     format: Mapped[str] = mapped_column(String, default="mp3")
     last_sync: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class PlaylistItem(Base):
@@ -84,7 +84,7 @@ class PlaylistItem(Base):
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     artist: Mapped[str | None] = mapped_column(String, nullable=True)
     output_path: Mapped[str | None] = mapped_column(String, nullable=True)
-    synced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    synced_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class LibraryItem(Base):
@@ -99,7 +99,7 @@ class LibraryItem(Base):
     album: Mapped[str | None] = mapped_column(String, nullable=True)
     duration: Mapped[float | None] = mapped_column(Float, nullable=True)
     format: Mapped[str] = mapped_column(String, default="")
-    last_scan: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_scan: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class CoverCache(Base):
@@ -110,4 +110,4 @@ class CoverCache(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     url: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))

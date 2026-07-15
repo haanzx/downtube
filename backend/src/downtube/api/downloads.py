@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -76,7 +77,10 @@ async def events(request: Request):
             while True:
                 if await request.is_disconnected():
                     break
-                event = await queue.get()
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    continue
                 yield f"data: {json.dumps(event)}\n\n"
         finally:
             broker.unsubscribe(queue)

@@ -54,29 +54,33 @@ async function save() {
 <template>
   <div class="mx-auto max-w-3xl px-6 py-8 space-y-6">
     <header>
-      <h1 class="text-2xl font-bold tracking-tight">Pengaturan</h1>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <h1 class="text-3xl font-bold tracking-tight">Pengaturan</h1>
+      <p class="mt-1 text-sm text-black/40 dark:text-white/40">
         Konfigurasi tampilan, format, kualitas, cover, lirik, dan performa.
       </p>
     </header>
 
     <!-- Theme -->
-    <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-      <h2 class="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Tampilan</h2>
+    <div class="am-card">
+      <h2 class="am-section-title mb-3">Tampilan</h2>
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm font-medium">Mode tampilan</p>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
+          <p class="text-[15px] font-medium">Mode tampilan</p>
+          <p class="text-xs text-black/40 dark:text-white/40">
             {{ isDark ? "Mode gelap aktif" : "Mode terang aktif" }}
           </p>
         </div>
         <button
+          type="button"
+          role="switch"
+          :aria-checked="isDark"
+          :aria-label="isDark ? 'Mode gelap aktif' : 'Mode terang aktif'"
           @click="toggle"
-          class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors"
-          :class="isDark ? 'bg-slate-900 dark:bg-white' : 'bg-slate-300'"
+          class="am-toggle"
+          :class="isDark ? 'bg-am-accent-dark' : 'bg-am-accent-light'"
         >
           <span
-            class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform dark:bg-slate-900"
+            class="am-toggle-knob"
             :class="isDark ? 'translate-x-6' : 'translate-x-1'"
           />
         </button>
@@ -85,12 +89,12 @@ async function save() {
 
     <form @submit.prevent="save" class="space-y-6">
       <!-- Download Settings -->
-      <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="mb-4 text-sm font-semibold text-slate-900 dark:text-white">Unduhan</h2>
+      <div class="am-card">
+        <h2 class="am-section-title mb-4">Unduhan</h2>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Format</label>
-            <select v-model="settings.default_format" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10">
+            <label for="setting-format" class="am-section-title mb-1.5 block">Format</label>
+            <select id="setting-format" v-model="settings.default_format" class="am-select w-full">
               <option value="mp3">MP3</option>
               <option value="opus">Opus</option>
               <option value="m4a">M4A</option>
@@ -98,16 +102,16 @@ async function save() {
             </select>
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Kualitas</label>
-            <select v-model="settings.default_quality" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10">
+            <label for="setting-quality" class="am-section-title mb-1.5 block">Kualitas</label>
+            <select id="setting-quality" v-model="settings.default_quality" class="am-select w-full">
               <option value="best">Terbaik</option>
               <option value="good">Bagus</option>
               <option value="ok">Cukup</option>
             </select>
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Sampul</label>
-            <select v-model="settings.default_cover_option" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10">
+            <label for="setting-cover" class="am-section-title mb-1.5 block">Sampul</label>
+            <select id="setting-cover" v-model="settings.default_cover_option" class="am-select w-full">
               <option value="embed">Tanam</option>
               <option value="file">File</option>
               <option value="both">Keduanya</option>
@@ -115,25 +119,28 @@ async function save() {
             </select>
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Konkurensi</label>
-            <input v-model="settings.download_concurrency" type="number" min="1" max="10" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
+            <label for="setting-concurrency" class="am-section-title mb-1.5 block">Konkurensi</label>
+            <input id="setting-concurrency" v-model="settings.download_concurrency" type="number" min="1" max="10" class="am-input" />
           </div>
         </div>
         <div class="mt-4 flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium">Download synced lyrics (.lrc)</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
+            <p class="text-[15px] font-medium">Download synced lyrics (.lrc)</p>
+            <p class="text-xs text-black/40 dark:text-white/40">
               {{ settings.default_lyrics_option === "lrc" ? "Aktif - Buat file .lrc" : "Nonaktif" }}
             </p>
           </div>
           <button
             type="button"
+            role="switch"
+            :aria-checked="settings.default_lyrics_option === 'lrc'"
+            :aria-label="settings.default_lyrics_option === 'lrc' ? 'Lirik sinkron aktif' : 'Lirik sinkron nonaktif'"
             @click="settings.default_lyrics_option = settings.default_lyrics_option === 'lrc' ? 'none' : 'lrc'"
-            class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors"
-            :class="settings.default_lyrics_option === 'lrc' ? 'bg-emerald-500' : 'bg-slate-300'"
+            class="am-toggle"
+            :class="settings.default_lyrics_option === 'lrc' ? 'bg-am-accent-light dark:bg-am-accent-dark' : 'bg-black/5 dark:bg-white/5'"
           >
             <span
-              class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform"
+              class="am-toggle-knob"
               :class="settings.default_lyrics_option === 'lrc' ? 'translate-x-6' : 'translate-x-1'"
             />
           </button>
@@ -141,36 +148,39 @@ async function save() {
       </div>
 
       <!-- Performance Settings -->
-      <div class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        <h2 class="mb-4 text-sm font-semibold text-slate-900 dark:text-white">Performa</h2>
+      <div class="am-card">
+        <h2 class="am-section-title mb-4">Performa</h2>
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium">Mode Hemat Daya</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">
+              <p class="text-[15px] font-medium">Mode Hemat Daya</p>
+              <p class="text-xs text-black/40 dark:text-white/40">
                 {{ settings.low_power_mode ? "Aktif - Mengurangi penggunaan CPU" : "Nonaktif" }}
               </p>
             </div>
             <button
               type="button"
+              role="switch"
+              :aria-checked="settings.low_power_mode"
+              :aria-label="settings.low_power_mode ? 'Mode hemat daya aktif' : 'Mode hemat daya nonaktif'"
               @click="settings.low_power_mode = !settings.low_power_mode"
-              class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors"
-              :class="settings.low_power_mode ? 'bg-emerald-500' : 'bg-slate-300'"
+              class="am-toggle"
+              :class="settings.low_power_mode ? 'bg-am-accent-light dark:bg-am-accent-dark' : 'bg-black/5 dark:bg-white/5'"
             >
               <span
-                class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform"
+                class="am-toggle-knob"
                 :class="settings.low_power_mode ? 'translate-x-6' : 'translate-x-1'"
               />
             </button>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Thread FFmpeg</label>
-              <input v-model="settings.ffmpeg_threads" type="number" min="1" max="4" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
+              <label for="setting-threads" class="am-section-title mb-1.5 block">Thread FFmpeg</label>
+              <input id="setting-threads" v-model="settings.ffmpeg_threads" type="number" min="1" max="4" class="am-input" />
             </div>
             <div>
-              <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Hasil Pencarian Maks</label>
-              <input v-model="settings.max_search_results" type="number" min="5" max="50" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
+              <label for="setting-max-results" class="am-section-title mb-1.5 block">Hasil Pencarian Maks</label>
+              <input id="setting-max-results" v-model="settings.max_search_results" type="number" min="5" max="50" class="am-input" />
             </div>
           </div>
         </div>
@@ -178,10 +188,10 @@ async function save() {
 
       <!-- Submit -->
       <div class="flex items-center gap-3">
-        <button type="submit" :disabled="saving" class="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:opacity-40 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
+        <button type="submit" :disabled="saving" :aria-busy="saving" class="am-btn-primary px-6">
           {{ saving ? "Menyimpan..." : "Simpan" }}
         </button>
-        <p v-if="feedback" class="animate-fade-in text-sm text-slate-500 dark:text-slate-400">{{ feedback }}</p>
+        <p v-if="feedback" role="status" aria-live="polite" class="animate-fade-in text-sm text-black/40 dark:text-white/40">{{ feedback }}</p>
       </div>
     </form>
   </div>

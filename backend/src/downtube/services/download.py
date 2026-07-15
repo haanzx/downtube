@@ -35,6 +35,7 @@ async def enqueue(db: AsyncSession, payload: DownloadRequest) -> QueueItem:
 async def delete_item(db: AsyncSession, item_id: int) -> bool:
     """Delete a QueueItem and its file from disk."""
     import os
+    from pathlib import Path
     from sqlalchemy import select
     from downtube.db.models import QueueItem
 
@@ -44,6 +45,11 @@ async def delete_item(db: AsyncSession, item_id: int) -> bool:
         return False
     if item.output_path and os.path.exists(item.output_path):
         os.remove(item.output_path)
+        p = Path(item.output_path)
+        for ext in (".lrc", ".jpg"):
+            sidecar = p.with_suffix(ext)
+            if sidecar.exists():
+                sidecar.unlink()
     await db.delete(item)
     await db.commit()
     return True
@@ -62,5 +68,6 @@ async def retry_item(db: AsyncSession, item_id: int) -> bool:
     item.progress = 0.0
     item.error = None
     item.phase = None
+    item.output_path = None
     await db.commit()
     return True

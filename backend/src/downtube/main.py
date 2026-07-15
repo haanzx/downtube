@@ -38,7 +38,7 @@ async def spa(full_path: str):
         if index.exists():
             return FileResponse(index)
     return JSONResponse(
-        status_code=200,
+        status_code=404,
         content={
             "detail": "Frontend not built yet. Run `npm run build` in frontend/ "
             "and reload."

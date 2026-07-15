@@ -260,11 +260,13 @@ def _save_cover_file(file_path: str, data: bytes) -> None:
 
 def _get_db_path() -> str:
     """Extract SQLite file path from DATABASE_URL."""
+    from pathlib import Path
     from downtube.config import settings
     url = settings.database_url
     for prefix in ("sqlite+aiosqlite:///./", "sqlite:///./", "sqlite+aiosqlite:///", "sqlite:///"):
         if url.startswith(prefix):
-            return url[len(prefix):]
+            path = url[len(prefix):]
+            return str(Path(path).resolve())
     return url
 
 

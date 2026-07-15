@@ -4,7 +4,15 @@
 
 @layer base {
   * {
-    @apply border-slate-200 dark:border-slate-700;
+    @apply border-black/5 dark:border-white/5;
+  }
+
+  html {
+    @apply text-base;
+  }
+
+  body {
+    @apply bg-am-bg-light text-black/90 antialiased dark:bg-am-bg-dark dark:text-white/90;
   }
 
   ::-webkit-scrollbar {
@@ -17,10 +25,82 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+    @apply rounded-full;
+    background: rgba(0, 0, 0, 0.15);
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-500;
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+@layer components {
+  .am-card {
+    @apply rounded-3xl border border-black/5 bg-am-surface-light p-5 shadow-sm transition-all duration-200
+           dark:border-white/5 dark:bg-am-surface-dark dark:shadow-black/5;
+  }
+
+  .am-btn-primary {
+    @apply rounded-3xl bg-am-accent-light px-5 py-2.5 text-sm font-semibold text-white
+           transition-all duration-200 hover:opacity-90 active:scale-[0.98]
+           dark:bg-am-accent-dark;
+  }
+
+  .am-btn-secondary {
+    @apply rounded-3xl border border-black/10 px-5 py-2.5 text-sm font-semibold
+           text-black/90 transition-all duration-200 hover:bg-black/5
+           dark:border-white/10 dark:text-white/90 dark:hover:bg-white/5;
+  }
+
+  .am-input {
+    @apply w-full rounded-3xl border border-black/5 bg-am-surface-light px-4 py-2.5
+           text-sm transition-all duration-200
+           placeholder:text-black/30
+           focus:border-am-accent-light focus:outline-none focus:ring-2 focus:ring-am-accent-light/20
+           dark:border-white/5 dark:bg-am-surface-dark
+           dark:placeholder:text-white/30
+           dark:focus:border-am-accent-dark dark:focus:ring-am-accent-dark/20;
+  }
+
+  .am-select {
+    @apply rounded-3xl border border-black/5 bg-am-surface-light px-4 py-2.5
+           text-sm transition-all duration-200
+           focus:border-am-accent-light focus:outline-none focus:ring-2 focus:ring-am-accent-light/20
+           dark:border-white/5 dark:bg-am-surface-dark
+           dark:focus:border-am-accent-dark dark:focus:ring-am-accent-dark/20;
+  }
+
+  .am-toggle {
+    @apply relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200;
+  }
+
+  .am-toggle-knob {
+    @apply inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200;
+  }
+
+  .am-section-title {
+    @apply text-sm font-semibold text-black/40 dark:text-white/40;
+  }
+}
+
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 }
