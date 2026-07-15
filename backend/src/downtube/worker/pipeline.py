@@ -218,6 +218,10 @@ class LyricsStage(PipelineStage):
     async def run(self, ctx: PipelineContext) -> None:
         from downtube.providers.lyrics import fetch_synced_lyrics
 
+        # Skip if lyrics option is none
+        if ctx.item.lyrics_option == "none":
+            return
+
         # Get video_id from context
         video_id = None
         if ctx.meta and ctx.meta.source_id:

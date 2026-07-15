@@ -12,6 +12,7 @@ class DownloadRequest(BaseModel):
     format: str | None = None
     quality: str | None = None
     cover_option: str | None = None
+    lyrics_option: str | None = None
 
 
 class SearchRequest(BaseModel):

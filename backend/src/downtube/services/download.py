@@ -17,6 +17,7 @@ async def enqueue(db: AsyncSession, payload: DownloadRequest) -> QueueItem:
     fmt = payload.format or defaults.get("default_format", "mp3")
     quality = payload.quality or defaults.get("default_quality", "best")
     cover = payload.cover_option or defaults.get("default_cover_option", "embed")
+    lyrics = payload.lyrics_option or defaults.get("default_lyrics_option", "lrc")
     return await queue_repo.add_item(
         db,
         url=payload.url,
@@ -27,6 +28,7 @@ async def enqueue(db: AsyncSession, payload: DownloadRequest) -> QueueItem:
         format=fmt,
         quality=quality,
         cover_option=cover,
+        lyrics_option=lyrics,
     )
 
 

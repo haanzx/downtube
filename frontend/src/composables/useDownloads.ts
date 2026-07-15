@@ -5,6 +5,7 @@ export interface DownloadOptions {
   format?: string;
   quality?: string;
   cover_option?: string;
+  lyrics_option?: string;
 }
 
 export function useDownloads() {

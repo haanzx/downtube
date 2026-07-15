@@ -8,6 +8,7 @@ interface Settings {
   default_format: string;
   default_quality: string;
   default_cover_option: string;
+  default_lyrics_option: string;
   download_concurrency: string;
   low_power_mode: boolean;
   ffmpeg_threads: string;
@@ -18,6 +19,7 @@ const settings = ref<Settings>({
   default_format: "mp3",
   default_quality: "best",
   default_cover_option: "embed",
+  default_lyrics_option: "lrc",
   download_concurrency: "1",
   low_power_mode: false,
   ffmpeg_threads: "1",
@@ -54,7 +56,7 @@ async function save() {
     <header>
       <h1 class="text-2xl font-bold tracking-tight">Pengaturan</h1>
       <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Konfigurasi tampilan, format, kualitas, cover, dan performa.
+        Konfigurasi tampilan, format, kualitas, cover, lirik, dan performa.
       </p>
     </header>
 
@@ -116,6 +118,25 @@ async function save() {
             <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Konkurensi</label>
             <input v-model="settings.download_concurrency" type="number" min="1" max="10" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 dark:border-slate-600 dark:bg-slate-700 dark:focus:border-white dark:focus:ring-white/10" />
           </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium">Download synced lyrics (.lrc)</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              {{ settings.default_lyrics_option === "lrc" ? "Aktif - Buat file .lrc" : "Nonaktif" }}
+            </p>
+          </div>
+          <button
+            type="button"
+            @click="settings.default_lyrics_option = settings.default_lyrics_option === 'lrc' ? 'none' : 'lrc'"
+            class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors"
+            :class="settings.default_lyrics_option === 'lrc' ? 'bg-emerald-500' : 'bg-slate-300'"
+          >
+            <span
+              class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform"
+              :class="settings.default_lyrics_option === 'lrc' ? 'translate-x-6' : 'translate-x-1'"
+            />
+          </button>
         </div>
       </div>
 
